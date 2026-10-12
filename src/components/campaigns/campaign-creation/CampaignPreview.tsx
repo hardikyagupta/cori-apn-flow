@@ -20,6 +20,11 @@ import { TemplateThumbnail } from "./TemplateCard";
 import { emailTemplates } from "./emailTemplates.data";
 import { buildFindings, groupFindings, type Finding } from "./previewFindings.data";
 import { FindingCard } from "./FindingCard";
+import PushPreviewBody from "./PushPreviewBody";
+import { appPushTemplates } from "./appPushTemplates.data";
+import { APP_OPTIONS } from "./appOptions.data";
+import { PlatformIcon } from "./PlatformIcons";
+import type { PushCampaignPrefill } from "@/data/pushCartFlow";
 
 const nf = new Intl.NumberFormat("en-US");
 
@@ -87,11 +92,14 @@ export default function CampaignPreview({
   schedule,
   onBack,
   onPublish,
+  publishLabel = "Save & publish",
   onEditStep,
   onAskCoMarketer,
   onAskFinding,
   chatOpen,
   chatSlot,
+  channel = "Email",
+  pushDetails,
 }: {
   campaignId: string;
   campaignName: string;
@@ -101,6 +109,8 @@ export default function CampaignPreview({
   schedule: ScheduleValues;
   onBack: () => void;
   onPublish: () => void;
+  /** Primary button's text — defaults to "Save & publish". */
+  publishLabel?: string;
   /** Jump back into the wizard at this step. */
   onEditStep: (stepId: string) => void;
   /** Opens a fresh co-marketer thread from the header CTA. */
@@ -111,13 +121,21 @@ export default function CampaignPreview({
    *  wizard's suggestion column, so the co-marketer is only in one place. */
   chatOpen: boolean;
   chatSlot?: ReactNode;
+  channel?: string;
+  /** What Cori drafted for an App Push campaign — listed beside the template. */
+  pushDetails?: PushCampaignPrefill["details"];
 }) {
   const [previewEmail, setPreviewEmail] = useState("");
   const [refreshing, setRefreshing] = useState(false);
+  const isPush = channel === "App Push Notification";
+  const [pushOs, setPushOs] = useState<"ios" | "android">("ios");
+  const [pushLayout, setPushLayout] = useState<"expanded" | "collapsed">("expanded");
 
   const name = campaignName;
   const tags = parseTags(setup.tags);
   const template = emailTemplates.find((t) => t.id === content.templateId);
+  const pushTemplate = appPushTemplates.find((t) => t.id === content.templateId);
+  const apps = APP_OPTIONS.filter((a) => audience.selectedApps.includes(a.id));
   const reach = reachFor(audience);
   const groups = groupFindings(buildFindings({ setup, audience, content, schedule }));
   const findingCount = groups.reduce((n, g) => n + g.items.length, 0);
@@ -173,19 +191,50 @@ export default function CampaignPreview({
           onClick={onPublish}
           className="dc-btn dc-btn-primary"
         >
-          Save &amp; publish
+          {publishLabel}
         </button>
       </header>
 
       <div className={cn("flex min-h-0 flex-1 gap-5", chatOpen ? "pr-5" : "")}>
         <div className="scroll-slim min-h-0 flex-1 overflow-y-auto px-14 py-6">
+          {isPush ? (
+            <PushPreviewBody
+              campaignId={campaignId}
+              campaignName={name}
+              setup={setup}
+              audience={audience}
+              content={content}
+              schedule={schedule}
+              pushDetails={pushDetails}
+              onEditStep={onEditStep}
+            />
+          ) : (
           <div className="flex items-start gap-5">
           {/* Left column — setup and audience */}
           <div className="flex w-[34%] shrink-0 flex-col gap-5">
-            <PreviewCard icon={Settings} title="Setup" onEdit={() => onEditStep("schedule")}>
+            <PreviewCard icon={Settings} title="Setup" onEdit={() => onEditStep(isPush ? "setup" : "schedule")}>
               <SubHeading>Campaign details</SubHeading>
               <Row label="Campaign ID:">{campaignId}</Row>
               <Row label="Campaign name:">{name}</Row>
+              {isPush && (
+                <Row label="Select app(s):">
+                  {apps.length ? (
+                    <div className="flex flex-wrap gap-1.5">
+                      {apps.map((a) => (
+                        <span
+                          key={a.id}
+                          className="inline-flex items-center gap-1.5 rounded-full border border-[#DDE2EE] bg-white py-1 pl-2 pr-3 font-manrope text-[13px] font-medium text-[#17173A]"
+                        >
+                          <PlatformIcon platform={a.platform} className="size-3.5" />
+                          {a.name}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    "—"
+                  )}
+                </Row>
+              )}
               <Row label="Tags:">
                 {tags.length ? (
                   <div className="flex flex-wrap gap-1.5">
@@ -208,20 +257,35 @@ export default function CampaignPreview({
                 <Row label="Google Analytics tracking:">
                   {setup.gaTracking ? (
                     <div className="space-y-0.5">
-                      <p>Source (utm_source) - Netcore</p>
-                      <p>Medium (utm_medium) - Email</p>
-                      <p>Campaign (utm_campaign) - {name}</p>
-                      <p>Content (utm_content) -</p>
-                      <p>Term (utm_term) - Campaign</p>
+                      <p>Source (utm_source) - {setup.utmParameters.source.value || "Netcore"}</p>
+                      <p>Medium (utm_medium) - {isPush ? setup.utmParameters.medium.value || "App Push" : "Email"}</p>
+                      <p>Campaign (utm_campaign) - {isPush ? setup.utmParameters.campaign.value || name : name}</p>
+                      <p>Content (utm_content) - {setup.utmParameters.content.value}</p>
+                      <p>Term (utm_term) - {setup.utmParameters.term.value || "Campaign"}</p>
                     </div>
                   ) : (
                     "Off"
                   )}
                 </Row>
                 <Row label="Conversion tracking:">
-                  {setup.conversionTracking ? setup.conversionEvent || "On" : "Off"}
+                  {setup.conversionTracking ? (
+                    isPush ? (
+                      <div className="space-y-0.5">
+                        <p>{setup.conversionEvent || "On"}</p>
+                        <p className="text-[#6F6F8D]">
+                          Window - {setup.conversionWindowValue} {setup.conversionWindowUnit}
+                        </p>
+                        <p className="text-[#6F6F8D]">Revenue parameter - {setup.revenueParameter}</p>
+                      </div>
+                    ) : (
+                      setup.conversionEvent || "On"
+                    )
+                  ) : (
+                    "Off"
+                  )}
                 </Row>
                 <Row label="Deduplication:">Off</Row>
+                {isPush && <Row label="Control group:">{schedule.controlGroupEnabled ? `On · ${schedule.controlGroupPercent}%` : "Off"}</Row>}
               </div>
             </PreviewCard>
 
@@ -256,6 +320,13 @@ export default function CampaignPreview({
               <SubHeading>Selected contacts</SubHeading>
               <p className="font-manrope text-sm leading-6 text-[#17173A]">{audienceSummary()}</p>
 
+              {isPush && pushDetails && (
+                <div className="mt-5">
+                  <SubHeading>Devices</SubHeading>
+                  <p className="font-manrope text-sm leading-6 text-[#17173A]">{pushDetails.devices}</p>
+                </div>
+              )}
+
               <div className="mt-5">
                 <SubHeading>Excluded</SubHeading>
                 <p className="font-manrope text-sm leading-6 text-[#17173A]">
@@ -282,6 +353,70 @@ export default function CampaignPreview({
               title="Content"
               onEdit={() => onEditStep("content")}
             >
+              {isPush ? (
+                <>
+                  <SubHeading>Notification</SubHeading>
+                  <Row label="Template name:">{pushTemplate?.name ?? "Not selected"}</Row>
+                  <Row label="Template ID:">{pushTemplate ? pushTemplate.id : "—"}</Row>
+                  {pushDetails && (
+                    <>
+                      <Row label="Title:">{pushDetails.title}</Row>
+                      <Row label="Body:">{pushDetails.body}</Row>
+                      <Row label="Rich media:">{pushDetails.richMedia ? "Shopping cart image" : "None"}</Row>
+                      <Row label="Countdown timer:">{pushDetails.countdown ? "09:34:28 (illustrative)" : "Off"}</Row>
+                      {pushDetails.promoCode && <Row label="Promo code:">{pushDetails.promoCode}</Row>}
+                    </>
+                  )}
+                  <Row label="Landing page:">App Homepage</Row>
+
+                  <div className="mt-6 rounded-lg border border-[#E8ECF4] bg-[#F7F9FC] p-6">
+                    <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                      <div className="inline-flex overflow-hidden rounded-md border border-[#DDE2EE] bg-white">
+                        {(["ios", "android"] as const).map((os) => (
+                          <button
+                            key={os}
+                            type="button"
+                            onClick={() => setPushOs(os)}
+                            className={cn(
+                              "px-4 py-1.5 font-manrope text-sm font-semibold transition-colors",
+                              pushOs === os ? "bg-[#2F68E5] text-white" : "text-[#6F6F8D] hover:bg-[#F7F9FC]"
+                            )}
+                          >
+                            {os === "ios" ? "iOS" : "Android"}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="inline-flex overflow-hidden rounded-md border border-[#DDE2EE] bg-white">
+                        {(["expanded", "collapsed"] as const).map((layout) => (
+                          <button
+                            key={layout}
+                            type="button"
+                            onClick={() => setPushLayout(layout)}
+                            className={cn(
+                              "px-4 py-1.5 font-manrope text-sm font-semibold capitalize transition-colors",
+                              pushLayout === layout ? "bg-[#2F68E5] text-white" : "text-[#6F6F8D] hover:bg-[#F7F9FC]"
+                            )}
+                          >
+                            {layout}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    {pushTemplate?.pushPreviews ? (
+                      <img
+                        src={pushTemplate.pushPreviews[`${pushOs}-${pushLayout}`]}
+                        alt={`${pushTemplate.name} on ${pushOs}`}
+                        className="mx-auto max-h-[560px] w-auto"
+                      />
+                    ) : (
+                      <p className="py-10 text-center font-manrope text-sm text-[#6F6F8D]">
+                        No template selected yet — pick one on the Content step and it renders here.
+                      </p>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <>
               <SubHeading>Sender's details</SubHeading>
               <Row label="Name:">{content.senderName || "—"}</Row>
               <Row label="Email ID:">
@@ -340,12 +475,14 @@ export default function CampaignPreview({
                   </p>
                 )}
               </div>
+                </>
+              )}
             </PreviewCard>
           </div>
 
           {/* Right rail — the co-marketer's review of this campaign. Hidden
               while the chat is docked; the thread is the same co-marketer. */}
-          {!chatOpen && (
+          {!chatOpen && !isPush && (
           <aside className="flex w-[380px] shrink-0 flex-col gap-5">
             <div className="rounded-lg border border-[#DDE2EE] bg-white p-4">
               <div className="flex items-center gap-2">
@@ -379,6 +516,7 @@ export default function CampaignPreview({
           </aside>
           )}
           </div>
+          )}
         </div>
 
         {chatSlot}

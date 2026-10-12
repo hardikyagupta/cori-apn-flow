@@ -35,9 +35,13 @@ export default function CampaignCreationStepper({
   campaignId,
   lastSaved,
   onStepSelect,
+  reachedIndex = -1,
 }: {
   steps: Step[];
   activeIndex: number;
+  /** Furthest step already visited — ones ahead of the active step up to here
+   *  can be jumped to as well (e.g. an AI-built draft arrives finished). */
+  reachedIndex?: number;
   campaignId?: string;
   lastSaved?: string;
   onStepSelect?: (index: number) => void;
@@ -48,7 +52,7 @@ export default function CampaignCreationStepper({
         {steps.map((step, i) => {
           const status: StepStatus =
             i < activeIndex ? "completed" : i === activeIndex ? "active" : "upcoming";
-          const canJump = status === "completed";
+          const canJump = status === "completed" || (i !== activeIndex && i <= reachedIndex);
           return (
             <div key={step.id} className="flex items-center">
               <button

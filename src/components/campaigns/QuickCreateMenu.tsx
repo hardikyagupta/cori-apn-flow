@@ -1,8 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import iconJourney from "/campaign-assets/qc-journey.svg";
 import iconEmail from "/campaign-assets/qc-email.svg";
 import iconSms from "/campaign-assets/qc-sms.svg";
 import iconAppPush from "/campaign-assets/qc-app-push.svg";
+import iconAppPushAb from "/campaign-assets/qc-app-push-ab.svg";
+import iconAppPushSplit from "/campaign-assets/qc-app-push-split.svg";
+import iconAppPushMulti from "/campaign-assets/qc-app-push-multi.svg";
 import iconWebPush from "/campaign-assets/qc-web-push.svg";
 import iconWhatsapp from "/campaign-assets/qc-whatsapp.svg";
 import iconInApp from "/campaign-assets/qc-in-app.svg";
@@ -41,7 +44,16 @@ interface QuickCreateItem {
   inset: string;
   /** Items that open a further level show the caret on the right. */
   hasSubmenu?: boolean;
+  /** The second level itself — shown as a flyout beside the row. */
+  submenu?: SubmenuItem[];
   /** Disabled items are shown but not selectable. */
+  disabled?: boolean;
+}
+
+interface SubmenuItem {
+  label: string;
+  icon: ReactNode;
+  /** Shown but not selectable yet. */
   disabled?: boolean;
 }
 
@@ -50,6 +62,16 @@ interface QuickCreateSection {
   heading?: string;
   items: QuickCreateItem[];
 }
+
+/** Each campaign type's own exported icon, drawn at its full 16px box. */
+const typeIcon = (src: string) => <img src={src} alt="" className="block size-[16px] shrink-0" />;
+
+const APP_PUSH_SUBMENU: SubmenuItem[] = [
+  { label: "Regular campaign", icon: <ItemIcon src={iconAppPush} inset="6.47% 7.14% 5.95% 5.36%" /> },
+  { label: "A/B campaign", disabled: true, icon: typeIcon(iconAppPushAb) },
+  { label: "Split campaign", disabled: true, icon: typeIcon(iconAppPushSplit) },
+  { label: "Multi message", disabled: true, icon: typeIcon(iconAppPushMulti) },
+];
 
 const SECTIONS: QuickCreateSection[] = [
   {
@@ -65,6 +87,8 @@ const SECTIONS: QuickCreateSection[] = [
         display: "App push",
         icon: iconAppPush,
         inset: "6.47% 7.14% 5.95% 5.36%",
+        hasSubmenu: true,
+        submenu: APP_PUSH_SUBMENU,
       },
       { label: "Web Push Notification", display: "Web push", icon: iconWebPush, inset: "6.47% 6.52% 4.93% 5.53%", disabled: true },
       { label: "Whatsapp", icon: iconWhatsapp, inset: "5.21%", disabled: true },
@@ -114,6 +138,40 @@ export default function QuickCreateMenu({ onSelect }: { onSelect?: (label: strin
   const [activeTab, setActiveTab] = useState<Tab>("Campaigns");
   const [query, setQuery] = useState("");
   const [hintIndex, setHintIndex] = useState(0);
+  // The open flyout: which row, how far down the menu it starts, and which side
+  // has room for it.
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const closeTimer = useRef<number | null>(null);
+  const [flyout, setFlyout] = useState<{ label: string; top: number; side: "right" | "left" | "inside" } | null>(null);
+
+  const openFlyout = (item: QuickCreateItem, row: HTMLElement) => {
+    if (closeTimer.current) window.clearTimeout(closeTimer.current);
+    const wrap = wrapRef.current;
+    if (!wrap) return;
+    const w = wrap.getBoundingClientRect();
+    const r = row.getBoundingClientRect();
+    const FLYOUT_W = 232;
+    // Beside the menu when there's room on either side; otherwise (a narrow
+    // window) it overlaps the menu's right edge, just under its row.
+    const side =
+      window.innerWidth - w.right >= FLYOUT_W
+        ? "right"
+        : w.left >= FLYOUT_W
+          ? "left"
+          : "inside";
+    setFlyout({
+      label: item.label,
+      top: side === "inside" ? r.bottom - w.top + 2 : r.top - w.top - 8,
+      side,
+    });
+  };
+  const scheduleClose = () => {
+    if (closeTimer.current) window.clearTimeout(closeTimer.current);
+    closeTimer.current = window.setTimeout(() => setFlyout(null), 140);
+  };
+  useEffect(() => () => {
+    if (closeTimer.current) window.clearTimeout(closeTimer.current);
+  }, []);
 
   // Rotate the placeholder while the field is empty (matches the Figma anim).
   useEffect(() => {
@@ -131,8 +189,13 @@ export default function QuickCreateMenu({ onSelect }: { onSelect?: (label: strin
       .filter((s) => s.items.length > 0);
   }, [query, activeTab]);
 
+  const flyoutItem = flyout
+    ? sections.flatMap((sec) => sec.items).find((i) => i.label === flyout.label)
+    : undefined;
+
   return (
-    <div className="flex w-[364px] flex-col overflow-hidden rounded-[6px] border border-[#DDE2EE] bg-white font-manrope shadow-[0px_5px_15px_0px_rgba(23,23,58,0.15)]">
+    <div ref={wrapRef} className="relative w-[364px]">
+    <div className="flex w-full flex-col overflow-hidden rounded-[6px] border border-[#DDE2EE] bg-white font-manrope shadow-[0px_5px_15px_0px_rgba(23,23,58,0.15)]">
       {/* Header — search field + tab switch */}
       <div className="shrink-0 px-[14px] pt-[14px]">
         <div className="flex items-center justify-between gap-[8px] rounded-[6px] border border-[#DDE2EE] px-[12px] py-[8px]">
@@ -236,6 +299,28 @@ export default function QuickCreateMenu({ onSelect }: { onSelect?: (label: strin
                   );
                 }
 
+                if (item.submenu) {
+                  const active = flyout?.label === item.label;
+                  return (
+                    <button
+                      key={item.label}
+                      type="button"
+                      aria-haspopup="menu"
+                      aria-expanded={active}
+                      onMouseEnter={(e) => openFlyout(item, e.currentTarget)}
+                      onMouseLeave={scheduleClose}
+                      onFocus={(e) => openFlyout(item, e.currentTarget)}
+                      onClick={(e) => (active ? setFlyout(null) : openFlyout(item, e.currentTarget))}
+                      className={cn(
+                        "flex w-full items-center gap-[8px] rounded-[4px] p-[8px] text-left transition-colors",
+                        active ? "bg-[#F4F8FF] [&_span]:text-[#2F68E5]" : "hover:bg-[#F7F9FC]"
+                      )}
+                    >
+                      {row}
+                    </button>
+                  );
+                }
+
                 return (
                   <button
                     key={item.label}
@@ -251,6 +336,47 @@ export default function QuickCreateMenu({ onSelect }: { onSelect?: (label: strin
           ))
         )}
       </div>
+    </div>
+
+    {flyout && flyoutItem?.submenu && (
+      <div
+        role="menu"
+        onMouseEnter={() => closeTimer.current && window.clearTimeout(closeTimer.current)}
+        onMouseLeave={scheduleClose}
+        className={cn(
+          "absolute z-10 w-[224px] rounded-[6px] border border-[#DDE2EE] bg-white p-[7px] font-manrope shadow-[0px_5px_15px_0px_rgba(23,23,58,0.15)] animate-in fade-in duration-150",
+          flyout.side === "right" && "left-[calc(100%+4px)] slide-in-from-left-1",
+          flyout.side === "left" && "right-[calc(100%+4px)] slide-in-from-right-1",
+          flyout.side === "inside" && "right-[12px] z-20 slide-in-from-top-1"
+        )}
+        style={{ top: Math.max(0, flyout.top) }}
+      >
+        {flyoutItem.submenu.map((sub) =>
+          sub.disabled ? (
+            <div
+              key={sub.label}
+              role="menuitem"
+              aria-disabled="true"
+              className="flex w-full cursor-default items-center gap-[10px] rounded-[4px] p-[8px] text-left text-[14px] font-semibold leading-[18px] text-[#17173A]"
+            >
+              {sub.icon}
+              {sub.label}
+            </div>
+          ) : (
+            <button
+              key={sub.label}
+              type="button"
+              role="menuitem"
+              onClick={() => onSelect?.(flyoutItem.label)}
+              className="flex w-full items-center gap-[10px] rounded-[4px] p-[8px] text-left text-[14px] font-semibold leading-[18px] text-[#17173A] transition-colors hover:bg-[#F7F9FC]"
+            >
+              {sub.icon}
+              {sub.label}
+            </button>
+          )
+        )}
+      </div>
+    )}
     </div>
   );
 }

@@ -31,7 +31,7 @@ export interface PushAIScenario {
   revenueParameter: string;
 }
 
-const CONSUMER_APPS = ["neww_1", "cart_recovery_android"];
+export const CONSUMER_APPS = ["neww_1", "cart_recovery_android"];
 
 export const PUSH_AI_SCENARIOS: PushAIScenario[] = [
   {

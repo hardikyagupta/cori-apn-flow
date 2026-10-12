@@ -11,6 +11,9 @@ import LaunchConfetti from "@/components/campaigns/LaunchConfetti";
 import CoMarketerReviewBanner from "@/components/campaigns/CoMarketerReviewBanner";
 import Pagination from "@/components/campaigns/Pagination";
 import ChatInterface, { type ReviewCampaignContext } from "@/components/ChatInterface";
+import { createPortal } from "react-dom";
+import CampaignCreationOverlay from "@/components/campaigns/campaign-creation/CampaignCreationOverlay";
+import type { PushCampaignPrefill } from "@/data/pushCartFlow";
 import DecisioningNudge from "@/components/campaigns/DecisioningNudge";
 import AiDashboardNudge from "@/components/campaigns/AiDashboardNudge";
 import MarketingAgentsOverlay from "@/components/MarketingAgentsOverlay";
@@ -70,6 +73,10 @@ export default function Campaigns() {
   const [campaignRows, setCampaignRows] = useState<Campaign[]>(initialCampaigns);
   // One-shot confetti layer over the whole page — mounted only while it plays.
   const [confettiActive, setConfettiActive] = useState(false);
+  // "Preview campaign" on Cori's App Push brief — opens the creation wizard on
+  // its preview screen with the campaign Cori drafted in chat.
+  const [pushPrefill, setPushPrefill] = useState<PushCampaignPrefill | null>(null);
+  const [pushPreviewOpen, setPushPreviewOpen] = useState(false);
   const { toast } = useToast();
 
   // Coordinate mount → enter and leave → unmount so both directions animate.
@@ -279,6 +286,10 @@ export default function Campaigns() {
                 enabledAgents={enabledAgents}
                 setEnabledAgents={setEnabledAgents}
                 onCloseInterface={() => setChatOpen(false)}
+                onPreviewPushCampaign={(prefill) => {
+                  setPushPrefill(prefill);
+                  setPushPreviewOpen(true);
+                }}
                 onReviewArtifact={(card) =>
                   setReviewSegment({ title: card.title, description: card.description })
                 }
@@ -287,6 +298,17 @@ export default function Campaigns() {
           )}
         </div>
       </div>
+
+      {createPortal(
+        <CampaignCreationOverlay
+          open={pushPreviewOpen}
+          channel="App Push Notification"
+          prefill={pushPrefill}
+          onClose={() => setPushPreviewOpen(false)}
+          onLaunched={handleCampaignLaunched}
+        />,
+        document.body
+      )}
 
       {/* Segment creation canvas — "Review segment" on the Segment agent's card
           in the campaigns thread lands here too, on the same rules. */}
