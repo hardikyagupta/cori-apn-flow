@@ -212,7 +212,10 @@ export default function CoriQuestionsCard({
       </div>
 
       <div className="flex shrink-0 items-center justify-between border-t border-[#EBEBF5] px-4 py-3">
-        <div className="flex items-center gap-1 font-manrope font-medium text-[#6F6F8D]" style={{ fontSize: "12px" }}>
+        <div
+          className={cn("flex items-center gap-1 font-manrope font-medium text-[#6F6F8D]", total <= 1 && "invisible")}
+          style={{ fontSize: "12px" }}
+        >
           <button
             type="button"
             aria-label="Previous question"
@@ -236,16 +239,18 @@ export default function CoriQuestionsCard({
           </button>
         </div>
         <div className="flex items-center gap-2">
-          <button type="button" onClick={() => advance(null)} className="dc-btn dc-btn-secondary">
-            Skip
-          </button>
+          {!question.required && (
+            <button type="button" onClick={() => advance(null)} className="dc-btn dc-btn-secondary">
+              Skip
+            </button>
+          )}
           <button
             type="button"
             disabled={!canContinue}
             onClick={() => canContinue && advance(choice)}
             className="dc-btn dc-btn-primary"
           >
-            {isLast ? "Done" : "Continue"}
+            {isLast ? question.confirmLabel ?? "Done" : "Continue"}
           </button>
         </div>
       </div>

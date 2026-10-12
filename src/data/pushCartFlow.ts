@@ -17,6 +17,16 @@ export function isPushCartPrompt(message: string): boolean {
   return /app\s*push|\bapn\b|push\s*notification/i.test(message) && /cart/i.test(message);
 }
 
+/** The channel-agnostic opener — the marketer names who to reach, not the
+ *  channel, so Cori recommends one first (see CHANNEL_QUESTION). */
+export function isChannelAskPrompt(message: string): boolean {
+  return (
+    /cart/i.test(message) &&
+    /(haven'?t|have not|not|without)\s+(checked\s*out|check\s*out|purchased|bought|completed)/i.test(message) &&
+    !isPushCartPrompt(message)
+  );
+}
+
 export type FlowAnswers = Record<string, string | null>;
 
 export interface FlowQuestion {
@@ -27,6 +37,10 @@ export interface FlowQuestion {
   otherPlaceholder?: string;
   /** Adds a calendar button to the Other row that picks a date and time. */
   otherDateTime?: boolean;
+  /** Can't be passed over — the Skip button is dropped. */
+  required?: boolean;
+  /** Label for this question's primary button when it is the last one. */
+  confirmLabel?: string;
   /** Only asked when this passes (e.g. the promo-code question). */
   showIf?: (answers: FlowAnswers) => boolean;
   /** Id of the question `showIf` reads — until it's answered, this question
@@ -39,6 +53,23 @@ export const DISCOUNT_OBJECTIVE = "Offer a discount to encourage conversion";
 export const PROMO_YES = "Yes, I'll provide a promo code";
 export const SEND_SPECIFIC = "Send at a specific date and time";
 export const SEND_OPTIMIZER = "Use the Send time optimizer agent";
+
+export const CHANNEL_YES = "Yes, use App Push";
+export const CHANNEL_EXPLORE = "Explore other channels";
+
+/** Cori's recommendation, said before any campaign question is asked. */
+export const CHANNEL_RECOMMENDATION =
+  "App Push has delivered a 24% higher engagement rate than your other channels over the last 30 days, making it a strong choice to re-engage shoppers who haven't completed their purchase. Would you like to use it for this campaign?";
+
+export const CHANNEL_QUESTIONS: FlowQuestion[] = [
+  {
+    id: "channel",
+    title: "Would you like to use App Push for this campaign?",
+    options: [CHANNEL_YES, CHANNEL_EXPLORE],
+    required: true,
+    confirmLabel: "Continue",
+  },
+];
 
 export const STAGE_ONE_QUESTIONS: FlowQuestion[] = [
   {
@@ -144,6 +175,13 @@ export function draftFrom(one: FlowAnswers, two: FlowAnswers, promoCode?: string
   };
 }
 
+/** The discount path shows a first, softer draft before the one it lands on —
+ *  the marketer's feedback below is what turns it into the current copy. */
+export const FIRST_DRAFT_TITLE = "Your cart won't wait! 🔥";
+export const FIRST_DRAFT_BODY = "Get your offer before it's gone.";
+export const FIRST_DRAFT_FEEDBACK =
+  "Make the offer more specific by showing the discount amount, and create more urgency by highlighting that the exclusive offer ends tonight.";
+
 /** Title with {{disc_value}} filled in once the marketer has typed a value. */
 export function resolvedTitle(d: Pick<PushCartDraft, "title" | "discountValue">): string {
   return d.discountValue.trim() ? d.title.replace(/\{\{\s*disc_value\s*\}\}/g, d.discountValue.trim()) : d.title;
@@ -248,12 +286,12 @@ export function prefillFrom(d: PushCartDraft): PushCampaignPrefill {
 
 /** Events the flow's cards send back up to the chat. */
 export type PushFlowEvent =
-  | { type: "questions"; stage: 1 | 2; answers: FlowAnswers; questions: FlowQuestion[] }
+  | { type: "questions"; stage: 0 | 1 | 2; answers: FlowAnswers; questions: FlowQuestion[] }
   | { type: "content"; draft: PushCartDraft }
   | { type: "changes" }
   | { type: "preview"; draft: PushCartDraft };
 
 export type PushFlowCard =
-  | { kind: "questions"; stage: 1 | 2; questions: FlowQuestion[] }
-  | { kind: "content"; draft: PushCartDraft; needsPromo: boolean }
+  | { kind: "questions"; stage: 0 | 1 | 2; questions: FlowQuestion[] }
+  | { kind: "content"; draft: PushCartDraft; needsPromo: boolean; version?: number; superseded?: boolean }
   | { kind: "brief"; draft: PushCartDraft };
