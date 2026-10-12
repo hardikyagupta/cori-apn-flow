@@ -70,14 +70,20 @@ function NotificationPreview({ draft }: { draft: PushCartDraft }) {
 function ContentCard({
   draft: initial,
   needsPromo,
+  version,
+  superseded,
   onEvent,
 }: {
   draft: PushCartDraft;
   needsPromo: boolean;
+  version?: number;
+  /** A newer draft has replaced this one — it stays readable but can't be sent on. */
+  superseded?: boolean;
   onEvent: (e: PushFlowEvent) => void;
 }) {
   const [draft, setDraft] = useState(initial);
-  const [confirmed, setConfirmed] = useState(false);
+  const [sent, setSent] = useState(false);
+  const confirmed = sent || Boolean(superseded);
   const set = <K extends keyof PushCartDraft>(key: K, value: PushCartDraft[K]) =>
     setDraft((d) => ({ ...d, [key]: value }));
   const hasVariable = /\{\{\s*disc_value\s*\}\}/.test(draft.title);
@@ -85,7 +91,10 @@ function ContentCard({
   return (
     <div className="w-full overflow-hidden rounded-lg border border-[#DDE2EE] bg-white">
       <div className="flex items-center justify-between gap-3 border-b border-[#E8ECF4] px-4 py-3">
-        <p className="font-manrope text-[15px] font-bold text-[#17173A]">Notification draft</p>
+        <p className="font-manrope text-[15px] font-bold text-[#17173A]">
+          Notification draft
+          {version ? <span className="ml-2 font-semibold text-[#6F6F8D]">v{version}</span> : null}
+        </p>
         <span className="truncate rounded-full bg-[#F3F6FF] px-2.5 py-1 font-manrope text-[11px] font-semibold text-[#2F68E5]">
           {PUSH_CART_TEMPLATE_NAME} · ID {PUSH_CART_TEMPLATE_ID}
         </span>
@@ -132,7 +141,9 @@ function ContentCard({
         </div>
       </div>
       <div className="border-t border-[#E8ECF4] px-4 py-3">
-        {confirmed ? (
+        {superseded ? (
+          <p className="font-manrope text-[13px] font-medium text-[#6F6F8D]">Replaced by the next draft</p>
+        ) : confirmed ? (
           <p className="flex items-center gap-2 font-manrope text-[13px] font-semibold text-[#17173A]">
             <Check className="size-4 text-[#00A676]" strokeWidth={2.4} />
             Notification confirmed
@@ -142,7 +153,7 @@ function ContentCard({
             type="button"
             className="dc-btn dc-btn-primary"
             onClick={() => {
-              setConfirmed(true);
+              setSent(true);
               onEvent({ type: "content", draft });
             }}
           >
@@ -228,6 +239,15 @@ export default function PushFlowCardView({
       />
     );
   }
-  if (card.kind === "content") return <ContentCard draft={card.draft} needsPromo={card.needsPromo} onEvent={onEvent} />;
+  if (card.kind === "content")
+    return (
+      <ContentCard
+        draft={card.draft}
+        needsPromo={card.needsPromo}
+        version={card.version}
+        superseded={card.superseded}
+        onEvent={onEvent}
+      />
+    );
   return <BriefCard draft={card.draft} onEvent={onEvent} />;
 }

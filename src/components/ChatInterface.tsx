@@ -27,6 +27,14 @@ import type { AudienceTestCardData } from '@/components/AudienceTestQuestionCard
 import type { QuestionRecapEntry } from '@/components/campaigns/CoMarketerQuestionCard';
 import {
   isPushCartPrompt,
+  isChannelAskPrompt,
+  CHANNEL_QUESTIONS,
+  CHANNEL_RECOMMENDATION,
+  CHANNEL_YES,
+  DISCOUNT_OBJECTIVE,
+  FIRST_DRAFT_TITLE,
+  FIRST_DRAFT_BODY,
+  FIRST_DRAFT_FEEDBACK,
   STAGE_ONE_QUESTIONS,
   STAGE_TWO_QUESTIONS,
   PROMO_YES,
@@ -529,6 +537,7 @@ const DockedBodySkeleton = ({
 };
 
 const PUSH_LOADER_LABELS = {
+  channel: ['Comparing channel performance...', 'Checking engagement over 30 days...', 'Picking the best channel...'],
   questions: ['Reviewing cart activity...', 'Estimating app push reach...', 'Preparing a few questions...'],
   draft: ['Finding the right template...', 'Writing the title and message...', 'Adding cart image and countdown...'],
   delivery: ['Analyzing engagement patterns...', 'Sizing up customer segments...', 'Balancing conversion and profit...'],
@@ -2325,7 +2334,7 @@ The content has been updated across all channels to reflect your changes.`;
   // The Questions card in flight — docked above the composer (not in the thread)
   // so it stays in line with the input, like the journey co-marketer's.
   const [dockedQuestions, setDockedQuestions] = useState<Extract<PushFlowCard, { kind: 'questions' }> | null>(null);
-  const pushFlowRef = useRef<{ active: boolean; one: FlowAnswers; two: FlowAnswers; draft: PushCartDraft | null }>({
+  const pushFlowRef = useRef<{ active: boolean; one: FlowAnswers; two: FlowAnswers; draft: PushCartDraft | null; v2?: PushCartDraft | null }>({
     active: false, one: {}, two: {}, draft: null,
   });
 
@@ -2388,6 +2397,27 @@ The content has been updated across all channels to reflect your changes.`;
     stickToBottomFor(2500);
   };
 
+  /** "I want to target users who added to cart but haven't checked out" — no
+   *  channel named, so Cori recommends one before asking anything about the
+   *  campaign. Confirming App Push carries straight on into the usual flow. */
+  const startChannelAsk = (message: string) => {
+    pushFlowRef.current = { active: true, one: {}, two: {}, draft: null };
+    const sentMsgIndex = messages.length;
+    appendUserTurn({ content: message, navLabel: 'Channel' });
+    setTimeout(() => {
+      document.getElementById(`msg-${sentMsgIndex}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 80);
+    playCoriReply(
+      {
+        content: CHANNEL_RECOMMENDATION,
+        pushFlowCard: { kind: 'questions', stage: 0, questions: CHANNEL_QUESTIONS },
+      },
+      ['Comparing how each channel performed over the last 30 days to find the best fit for re-engaging shoppers who left items in their cart'],
+      3,
+      PUSH_LOADER_LABELS.channel,
+    );
+  };
+
   const startPushCartFlow = (message: string) => {
     pushFlowRef.current = { active: true, one: {}, two: {}, draft: null };
     const sentMsgIndex = messages.length;
@@ -2407,6 +2437,31 @@ The content has been updated across all channels to reflect your changes.`;
   };
 
   const handlePushFlowFreeText = (message: string) => {
+    const flow = pushFlowRef.current;
+    // A first draft is waiting on feedback: whatever the marketer says is the
+    // brief for the next version, which replaces it.
+    if (flow.v2) {
+      const next = flow.v2;
+      flow.v2 = null;
+      flow.draft = next;
+      setDynamicSuggestions(null);
+      setMessages(prev => prev.map(m =>
+        m.pushFlowCard?.kind === 'content' && !m.pushFlowCard.superseded
+          ? { ...m, pushFlowCard: { ...m.pushFlowCard, superseded: true } }
+          : m
+      ));
+      appendUserTurn({ content: message });
+      playCoriReply(
+        {
+          content: "Updated. The title now carries the discount amount, and the copy says the exclusive offer ends tonight.",
+          pushFlowCard: { kind: 'content', draft: next, needsPromo: flow.one.promo === PROMO_YES, version: 2 },
+        },
+        ['Rewriting the title to show the discount and the body to stress that the offer ends tonight'],
+        3,
+        PUSH_LOADER_LABELS.draft,
+      );
+      return;
+    }
     appendUserTurn({ content: message });
     playCoriReply(
       { content: "Noted. I can't apply free-form edits to the brief yet. Open Preview campaign and use Edit on any section to adjust it." },
@@ -2418,6 +2473,33 @@ The content has been updated across all channels to reflect your changes.`;
 
   const handlePushFlowEvent = (event: PushFlowEvent) => {
     const flow = pushFlowRef.current;
+    if (event.type === 'questions' && event.stage === 0) {
+      setDockedQuestions(null);
+      const picked = event.answers.channel ?? '';
+      appendUserTurn({ content: '', questionRecap: event.questions.map(q => ({ title: q.title, answer: picked || 'Skipped' })) });
+      if (picked === CHANNEL_YES) {
+        playCoriReply(
+          {
+            content: "Great! Let's identify the right audience for this campaign.",
+            pushFlowCard: { kind: 'questions', stage: 1, questions: STAGE_ONE_QUESTIONS },
+          },
+          undefined,
+          2,
+          PUSH_LOADER_LABELS.questions,
+        );
+      } else {
+        // Nothing else is wired up for other channels yet, so say so plainly
+        // and hand the conversation back rather than pretend to plan one.
+        flow.active = false;
+        playCoriReply(
+          { content: "Sure. Tell me which channel you'd like to look at and I'll start from there." },
+          undefined,
+          2,
+          PUSH_LOADER_LABELS.reply,
+        );
+      }
+      return;
+    }
     if (event.type === 'questions') {
       setDockedQuestions(null);
       const recap: QuestionRecapEntry[] = event.questions
@@ -2427,10 +2509,30 @@ The content has been updated across all channels to reflect your changes.`;
       if (event.stage === 1) {
         flow.one = event.answers;
         flow.draft = draftFrom(flow.one, {});
+        const needsPromo = flow.one.promo === PROMO_YES;
+        if (flow.one.objective === DISCOUNT_OBJECTIVE) {
+          // Discount path: a softer first draft, then the marketer's feedback
+          // turns it into the current copy (flow.v2).
+          flow.v2 = flow.draft;
+          const first = { ...flow.draft, title: FIRST_DRAFT_TITLE, body: FIRST_DRAFT_BODY };
+          playCoriReply(
+            {
+              content: "Here's a first draft of the notification on the Coupon Expiry Reminder template. Continue with it, or tell me what to change.",
+              pushFlowCard: { kind: 'content', draft: first, needsPromo, version: 1 },
+            },
+            ['Matching your objective to a template', 'Writing a first title and body', 'Adding the cart image and countdown'],
+            3,
+            PUSH_LOADER_LABELS.draft,
+          );
+          // The feedback is offered as a one-tap reply rather than typed for them.
+          setDynamicSuggestions([FIRST_DRAFT_FEEDBACK]);
+          setShowSuggestions(true);
+          return;
+        }
         playCoriReply(
           {
             content: "Here's the notification I've drafted on the Coupon Expiry Reminder template. Edit the title, body, discount, image or countdown, then continue.",
-            pushFlowCard: { kind: 'content', draft: flow.draft, needsPromo: flow.one.promo === PROMO_YES },
+            pushFlowCard: { kind: 'content', draft: flow.draft, needsPromo },
           },
           ['Finding a suitable template and crafting the notification title and message, with the cart image and countdown timer'],
           3,
@@ -2459,6 +2561,8 @@ The content has been updated across all channels to reflect your changes.`;
     }
     if (event.type === 'content') {
       flow.draft = event.draft;
+      flow.v2 = null;
+      setDynamicSuggestions(null);
       appendUserTurn({ content: 'This notification looks good.' });
       playCoriReply(
         {
@@ -2793,6 +2897,10 @@ The content has been updated across all channels to reflect your changes.`;
     // Cori's App Push cart-recovery conversation outranks the generic stories
     // below — its prompt would otherwise match a deep-research opener.
     if (conversationVariant === 'campaigns') {
+      if (isChannelAskPrompt(message)) {
+        startChannelAsk(message);
+        return;
+      }
       if (isPushCartPrompt(message)) {
         startPushCartFlow(message);
         return;
