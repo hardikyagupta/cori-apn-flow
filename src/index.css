@@ -1589,3 +1589,130 @@
   height: 0;
   margin: 2px 0;
 }
+
+/* AI action button — the gradient from the AI-agents bible (light blue → royal
+   → orange on a diagonal) with a grain overlay so the fill has texture rather
+   than reading as flat CSS. Used by the two agent CTAs in campaign creation.
+   The light end of the ramp is kept to a sliver: the button carries white text,
+   and the full-width light blue from the source swatch would not hold it. */
+.btn-ai-gradient {
+  position: relative;
+  overflow: hidden;
+  color: #fff;
+  border: 0;
+  background-image: linear-gradient(
+    115deg,
+    #8cc2fb 0%,
+    #5a93f5 14%,
+    #2f68e5 42%,
+    #6a63b4 62%,
+    #e8621f 86%,
+    #ff9f69 100%
+  );
+  text-shadow: 0 1px 2px rgba(23, 23, 58, 0.26);
+  transition: filter 160ms ease, box-shadow 160ms ease;
+}
+
+/* Grain: one tile of fractal noise, screened over the ramp. Kept subtle —
+   enough to break the banding, not enough to read as texture. */
+.btn-ai-gradient::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.3;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 120px 120px;
+}
+
+/* Border: the same rotating sweep the banner ring uses, in white so it reads
+   against the gradient rather than fighting it. ::before is the grain, so the
+   ring lives here. */
+.btn-ai-gradient::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1.25px;
+  pointer-events: none;
+  background: conic-gradient(
+    from var(--input-shimmer-angle),
+    rgba(255, 255, 255, 0) 0deg,
+    rgba(255, 255, 255, 0) 130deg,
+    rgba(255, 255, 255, 0.95) 195deg,
+    rgba(255, 255, 255, 0.4) 245deg,
+    rgba(255, 255, 255, 0) 310deg,
+    rgba(255, 255, 255, 0) 360deg
+  );
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  animation: inputShimmerSpin 5s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn-ai-gradient::before,
+  .btn-ai-gradient::after {
+    animation: none;
+  }
+  .btn-ai-gradient::after {
+    background: rgba(255, 255, 255, 0.5);
+  }
+}
+
+.btn-ai-gradient:hover {
+  filter: saturate(1.06) brightness(0.97);
+  box-shadow: 0 4px 14px -4px rgba(47, 104, 229, 0.45);
+}
+
+.btn-ai-gradient > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Segment agent offer banner — the same rotating conic ring the chat input
+   uses, at a lower amplitude and half the speed. This one sits on a form the
+   reader may ignore, so it should read as alive rather than as loading: the
+   colour stops spend most of the sweep transparent, and only a short arc
+   carries brand colour. Reuses --input-shimmer-angle and inputShimmerSpin. */
+.agent-offer-shimmer {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1.5px;
+  z-index: 0;
+  pointer-events: none;
+  background: conic-gradient(
+    from var(--input-shimmer-angle),
+    transparent 0deg,
+    transparent 170deg,
+    color-mix(in srgb, var(--shimmer-blue) 55%, transparent) 215deg,
+    var(--shimmer-blue) 250deg,
+    color-mix(in srgb, var(--shimmer-pink) 70%, transparent) 285deg,
+    color-mix(in srgb, var(--shimmer-blue) 40%, transparent) 320deg,
+    transparent 360deg
+  );
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  animation: inputShimmerSpin 8s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .agent-offer-shimmer {
+    animation: none;
+    opacity: 0;
+  }
+}
+

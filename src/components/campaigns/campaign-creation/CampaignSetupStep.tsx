@@ -13,6 +13,8 @@ export interface UtmParameters {
   medium: UtmParamConfig;
   campaign: UtmParamConfig;
   term: UtmParamConfig;
+  /** Not in the per-parameter drawer — only App Push's Setup step edits it. */
+  content: UtmParamConfig;
 }
 
 export const DEFAULT_UTM_PARAMETERS: UtmParameters = {
@@ -20,6 +22,7 @@ export const DEFAULT_UTM_PARAMETERS: UtmParameters = {
   medium: { enabled: true, value: "" },
   campaign: { enabled: false, value: "" },
   term: { enabled: false, value: "" },
+  content: { enabled: false, value: "" },
 };
 
 /** Same shape as DEFAULT_UTM_PARAMETERS, but with medium and campaign filled

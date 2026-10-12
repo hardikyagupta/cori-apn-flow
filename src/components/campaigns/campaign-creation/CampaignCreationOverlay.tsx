@@ -12,6 +12,7 @@ import {
   Monitor,
   Package,
   Percent,
+  Settings,
   ShoppingCart,
   Sparkles,
   Tag,
@@ -39,6 +40,7 @@ import CampaignAIPanel, {
   type CampaignSuggestion,
 } from "./CampaignAIPanel";
 import CampaignSetupStep, {
+  CAMPAIGN_GOALS,
   goalLabel,
   mergeTags,
   DEFAULT_UTM_PARAMETERS,
@@ -94,6 +96,13 @@ import {
   type Finding,
 } from "./previewFindings.data";
 import CampaignPreview from "./CampaignPreview";
+import PushCampaignNavbar from "./PushCampaignStepper";
+import PushSetupStep from "./PushSetupStep";
+import GoalApprovalCard, { type ApprovalQuestion } from "./GoalApprovalCard";
+import { describeApprovalAnswers } from "@/data/approvalTranscript";
+import StepCard from "./StepCard";
+import { CONSUMER_APPS } from "./pushAIScenarios.data";
+import type { PushCampaignPrefill } from "@/data/pushCartFlow";
 import ChatInterface, {
   type SeededTopic,
   type StarterChip,
@@ -140,6 +149,15 @@ const hasAIFlow = (channel: string) => channel === "Email" || channel === "App P
 
 /** Temporarily hide Assets without removing its configuration or UI. */
 const SHOW_ASSETS_STEP = false;
+
+/** App Push regular campaign's own step-by-step flow (see PushCampaignStepper):
+ *  Setup holds the apps and tracking, Audience who it goes to. */
+const PUSH_STEPS: Step[] = [
+  { id: "setup", label: "Setup", icon: Settings },
+  { id: "audience", label: "Audience", icon: Users },
+  { id: "content", label: "Content", icon: FileText },
+  { id: "schedule", label: "Schedule", icon: Calendar },
+];
 
 /** Canonical order — Assets can be restored ahead of the shared three steps. */
 function stepsFor(channel: string): Step[] {
@@ -321,24 +339,44 @@ const EMPTY_SETUP: SetupValues = {
  * the goal and hands back cuts to plot. Reached both by landing on the step and
  * by "Audience options" in the suggestion rail, so it lives out here.
  */
-function audienceCutsTopic(goalValue: string): SeededTopic {
-  const label = goalLabel(goalValue);
+function audienceCutsTopic(
+  goalValue: string,
+  brief = "",
+  goalText = "",
+  /** The card read back as questions and answers. Becomes the opening turn:
+   *  it is what the reader actually said, skips included. */
+  transcript = "",
+): SeededTopic {
+  // Whatever the reader gave us is what we work from: a goal they picked, text
+  // they typed instead, or nothing at all. A skip is an answer — it means "you
+  // decide" — so the agent still cuts, and its reply owns the assumption.
+  const label = goalLabel(goalValue) ?? (goalText.trim() || undefined);
+  const ask = label
+    ? `Build the audience for my ${label.toLowerCase()} campaign`
+    : "Build the audience for this campaign";
   return {
-    prompt: "Who should this campaign go to?",
+    // The goal belongs in the ask: the thread is answering "who should this
+    // win-back campaign go to", not the generic question, and the reply and
+    // the cards below both hang off that goal.
+    prompt: transcript || (brief ? `${ask} — ${brief}` : ask),
     navLabel: "Audience",
     // Building the cuts is the Segment agent's job, so the co-marketer hands
     // over and the thread shows that work happening before the cards land.
     agentId: "segment-agent",
     reasoningSteps: [
       "Reading 90 days of opens, clicks and orders",
-      `Scoring cohorts against "${label ?? "this campaign"}"`,
+      label ? `Scoring cohorts against "${label}"` : "Scoring cohorts on engagement and recency",
       "Checking channel reachability and consent",
       "Pairing each cut with the suppression it needs",
     ],
-    reply:
-      `I read your last 90 days of engagement against "${label ?? "this campaign"}" and pulled three cuts worth ` +
-      `considering, best fit first. Each one comes with the suppression I'd pair it with. ` +
-      `Review one and I'll plot it onto the form — you can still edit it there.`,
+    reply: label
+      ? `I read your last 90 days of engagement against "${label}" and pulled three cuts worth ` +
+        `considering, best fit first. Each one comes with the suppression I'd pair it with. ` +
+        `Review one and I'll plot it onto the form — you can still edit it there.`
+      : `You left the brief to me, so I scored your last 90 days on engagement and recency and ` +
+        `pulled the three cuts that tend to pay whatever the campaign is for, best fit first. ` +
+        `Each one comes with the suppression I'd pair it with. Review one and I'll plot it onto ` +
+        `the form — tell me the goal and I'll re-cut against it.`,
     setupApplyCard: {
       kind: "cohorts",
       title: "Audience options",
@@ -350,11 +388,77 @@ function audienceCutsTopic(goalValue: string): SeededTopic {
   };
 }
 
+/**
+ * What the Segment agent asks before it can cut an audience. This is the goal
+ * the setup step used to ask for outright — the agent needs it to score
+ * cohorts, so it asks in the chat instead of gating the form.
+ */
+const AUDIENCE_QUESTIONS: ApprovalQuestion[] = [
+  {
+    q: "What is this campaign for?",
+    type: "radio",
+    options: CAMPAIGN_GOALS.map((g) => ({ value: g.value, label: g.label })),
+  },
+  // The goal says which cohorts are relevant; these two say how to cut them.
+  // Reach against precision changes the size of every cut the agent proposes,
+  // and the holdbacks are the suppression it pairs with them — both are things
+  // only the marketer knows, and both are cheaper to ask than to undo.
+  {
+    q: "How should I balance reach and precision?",
+    type: "radio",
+    optional: true,
+    options: [
+      { value: "tight", label: "Tighter cut, highest intent" },
+      { value: "balanced", label: "Balanced" },
+      { value: "broad", label: "Widest reachable audience" },
+    ],
+  },
+  {
+    q: "Anyone I should hold back?",
+    type: "check",
+    // Nobody to hold back is a normal answer, so Send stays live either way.
+    optional: true,
+    options: [
+      { value: "recent-purchasers", label: "Recent purchasers" },
+      { value: "active-journey", label: "Already in an active journey" },
+      { value: "recently-contacted", label: "Contacted in the last 7 days" },
+      { value: "bounced", label: "Bounced or complained" },
+    ],
+  },
+];
+
+/** Sentence fragments for the answers, so the user's own turn reads as prose. */
+const REACH_PHRASE: Record<string, string> = {
+  tight: "a tight, high-intent cut",
+  balanced: "a balanced cut",
+  broad: "the widest reachable audience",
+};
+
+const HOLDBACK_PHRASE: Record<string, string> = {
+  "recent-purchasers": "recent purchasers",
+  "active-journey": "anyone already in an active journey",
+  "recently-contacted": "anyone contacted in the last 7 days",
+  bounced: "bounced or complained addresses",
+};
+
+/** "…, a balanced cut, holding back recent purchasers and bounced addresses." */
+function audienceBrief(reach?: string, holdbacks: string[] = [], holdbackText = ""): string {
+  const parts: string[] = [];
+  if (reach && REACH_PHRASE[reach]) parts.push(REACH_PHRASE[reach]);
+  const held = holdbacks.map((h) => HOLDBACK_PHRASE[h]).filter(Boolean);
+  if (holdbackText.trim()) held.push(holdbackText.trim());
+  if (held.length === 1) parts.push(`holding back ${held[0]}`);
+  else if (held.length > 1)
+    parts.push(`holding back ${held.slice(0, -1).join(", ")} and ${held[held.length - 1]}`);
+  return parts.join(", ");
+}
+
 export default function CampaignCreationOverlay({
   open,
   channel,
   onClose,
   onLaunched,
+  prefill,
 }: {
   open: boolean;
   /** Quick-create label that opened this, e.g. "Email". */
@@ -363,6 +467,9 @@ export default function CampaignCreationOverlay({
   /** Fired once the launching pop-up finishes, right before the wizard
    *  closes — the listing page uses this to add the row, toast, and confetti. */
   onLaunched?: (info: { name: string; aiGenerated: boolean }) => void;
+  /** A campaign Cori already drafted in chat (App Push) — the wizard opens
+   *  straight on its preview screen with these values instead of the prompt. */
+  prefill?: PushCampaignPrefill | null;
 }) {
   // Which cards this channel's accordion has — see stepsFor's own comment.
   const STEPS = stepsFor(channel);
@@ -412,6 +519,11 @@ export default function CampaignCreationOverlay({
   // Preview is the screen after the last step, not a fifth step — it replaces
   // the wizard chrome with its own header while the draft stays in state.
   const [previewOpen, setPreviewOpen] = useState(false);
+  // App Push's stepper: which step is showing, and the furthest one reached.
+  // The Segment agent's questions, drawn above the chat composer until answered.
+  const [goalApprovalOpen, setGoalApprovalOpen] = useState(false);
+  const [stepIndex, setStepIndex] = useState(0);
+  const [reachedIndex, setReachedIndex] = useState(0);
   // Campaign-level settings (tags, for now) live in their own drawer off the
   // navbar rather than a step, since they don't belong to any one of them.
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -456,6 +568,8 @@ export default function CampaignCreationOverlay({
       const freshName = newCampaignName();
       setCampaignName(freshName);
       setSetup((s) => ({ ...s, utmParameters: defaultUtmParameters(channel, freshName) }));
+      // App Push's Audience step opens on All contacts, like the reference.
+      if (channel === "App Push Notification") setAudience((a) => ({ ...a, mode: "all" }));
       // Channels with a prompt screen land here via it, and its "Build from
       // scratch" opens Audience on continue — every other channel skips that
       // screen, so open Send to itself here instead of starting with every
@@ -490,6 +604,9 @@ export default function CampaignCreationOverlay({
       setAudience(EMPTY_AUDIENCE);
       setContent(EMPTY_CONTENT);
       setPreviewOpen(false);
+      setStepIndex(0);
+      setReachedIndex(0);
+      setGoalApprovalOpen(false);
       // Fresh default send time — the module-level one ages with the session.
       setSchedule({ ...EMPTY_SCHEDULE, sendAt: defaultSendAt() });
       setAudienceFlash(false);
@@ -502,6 +619,46 @@ export default function CampaignCreationOverlay({
     }, SLIDE_MS);
     return () => clearTimeout(id);
   }, [open]);
+
+  // A campaign drafted in Cori's chat lands here fully built, on the preview
+  // screen — declared after the open effect above so its values win.
+  useEffect(() => {
+    if (!open || !prefill || channel !== "App Push Notification") return;
+    setCampaignAIGenerated(true);
+    audienceChat.current = false;
+    setCampaignName(prefill.campaignName);
+    setAudience({
+      ...EMPTY_AUDIENCE,
+      mode: "adhoc",
+      selectedApps: CONSUMER_APPS,
+      conditions: prefill.conditions,
+      conditionsReach: prefill.reach,
+    });
+    setContent({ ...EMPTY_CONTENT, templateId: prefill.templateId });
+    setSchedule({
+      ...EMPTY_SCHEDULE,
+      sendAt: prefill.sendAt ?? defaultSendAt(),
+      mode: prefill.sendAt ? "later" : "optimize",
+    });
+    setSetup((s) => ({
+      ...s,
+      tags: prefill.details.tags,
+      gaTracking: true,
+      conversionTracking: true,
+      conversionEvent: "Purchase",
+      conversionWindowValue: "7",
+      conversionWindowUnit: "Days",
+      revenueParameter: "Order value",
+      utmParameters: {
+        ...s.utmParameters,
+        campaign: { enabled: true, value: prefill.campaignName },
+        content: { enabled: true, value: "cart_recovery" },
+      },
+    }));
+    setReachedIndex(PUSH_STEPS.length - 1);
+    setIntroOpen(false);
+    setPreviewOpen(true);
+  }, [open, prefill]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Flip to open only once the closed panel is actually in the DOM — hence a
   // second effect keyed on `mounted` rather than doing this above. Scheduling
@@ -750,6 +907,7 @@ export default function CampaignCreationOverlay({
       // Target apps are filled in too — without them Message and Schedule
       // stay locked.
       const scenario = pushScenarioFor(prompt);
+      setReachedIndex(PUSH_STEPS.length - 1);
       setCampaignName(scenario.campaignName);
       setAudience({
         ...EMPTY_AUDIENCE,
@@ -942,6 +1100,31 @@ export default function CampaignCreationOverlay({
     window.setTimeout(() => scrollToStep(nextId), 380);
   };
 
+  /** App Push stepper — NEXT STEP / PREVIEW: check what the current step needs,
+   *  then move on (or open the preview from the last step). */
+  const goNextPushStep = () => {
+    if (stepIndex === 0) {
+      if (audience.selectedApps.length === 0) {
+        setAppRequiredTried(true);
+        setAppRequiredToast("Application is required.");
+        return;
+      }
+      if (setup.conversionTracking && !setup.conversionEvent.trim()) {
+        setConversionTried(true);
+        setAppRequiredToast("Conversion goal is not selected.");
+        return;
+      }
+    }
+    if (stepIndex >= PUSH_STEPS.length - 1) {
+      setPreviewOpen(true);
+      return;
+    }
+    const next = stepIndex + 1;
+    setStepIndex(next);
+    setReachedIndex((r) => Math.max(r, next));
+    canvasRef.current?.scrollTo({ top: 0 });
+  };
+
   /** Has this step got enough on it to read as done? */
   const isStepComplete = (id: string): boolean => {
     switch (id) {
@@ -1022,12 +1205,45 @@ export default function CampaignCreationOverlay({
     }
   };
 
+  /**
+   * "Build with Audience agent": open the docked chat and put the agent's
+   * questions above its composer. It can't cut an audience without knowing
+   * what the campaign is for, so it asks before doing anything.
+   */
+  const askGoalForSegment = () => {
+    audienceChat.current = true;
+    // No seeded topic: the agent has nothing to say until it knows the goal,
+    // and seeding one posted a user turn, started a generation behind the
+    // card and left the composer shimmering while it waited. The card is the
+    // whole turn.
+    setChatVariant("campaigns");
+    setChatMessage(undefined);
+    setChatTopic(null);
+    setFollowUpTopic(null);
+    setFollowUpSeq(0);
+    setGoalApprovalOpen(true);
+    setChatSession((n) => n + 1);
+    setChatOpen(true);
+  };
+
+  /** The answers came back — record the goal, drop the card, and let it cut. */
+  const handleGoalApproved = (goalValue: string, brief = "", goalText = "", transcript = "") => {
+    setGoalApprovalOpen(false);
+    // Only a picked goal is the campaign's goal — typed text and a skip are
+    // instructions to the agent, not values for the setup step's field.
+    if (goalValue) setSetup((st) => ({ ...st, goal: goalValue }));
+    // Same thread the cohort cards and their "Review audience" apply use.
+    setFollowUpTopic(audienceCutsTopic(goalValue, brief, goalText, transcript));
+    setFollowUpSeq((n) => n + 1);
+  };
+
   /** Opens a brand-new co-marketer thread, from either header CTA. Not tied to
    *  the audience step, so it's exempt from the auto-close effect below —
    *  expanding a card elsewhere in the wizard shouldn't dismiss a chat the
    *  user opened themselves from the navbar. */
   const openFreshChat = () => {
     audienceChat.current = false;
+    setGoalApprovalOpen(false);
     setChatVariant("campaigns");
     setChatMessage(undefined);
     setChatTopic(null);
@@ -1040,6 +1256,7 @@ export default function CampaignCreationOverlay({
   /** Drops a topic into the docked chat, opening it if it isn't up yet. */
   const openTopic = (topic: SeededTopic, fromAudienceStep = false) => {
     audienceChat.current = fromAudienceStep;
+    setGoalApprovalOpen(false);
     if (chatOpen) {
       setFollowUpTopic(topic);
       setFollowUpSeq((n) => n + 1);
@@ -1183,6 +1400,30 @@ export default function CampaignCreationOverlay({
         }}
         followUpTopic={followUpTopic}
         followUpSeq={followUpSeq}
+        approvalCard={
+          goalApprovalOpen ? (
+            <GoalApprovalCard
+              questions={AUDIENCE_QUESTIONS}
+              title="Segment agent"
+              onSubmit={(answers) => {
+                // None of the three is required — a skip means "you decide",
+                // so the agent still runs on whatever it was given, including
+                // free text typed instead of a pick.
+                handleGoalApproved(
+                  answers[0]?.values[0] ?? "",
+                  audienceBrief(
+                    answers[1]?.values[0],
+                    answers[2]?.values ?? [],
+                    answers[2]?.custom ?? "",
+                  ),
+                  answers[0]?.custom ?? "",
+                  describeApprovalAnswers(AUDIENCE_QUESTIONS, answers),
+                );
+              }}
+              onDismiss={() => setGoalApprovalOpen(false)}
+            />
+          ) : null
+        }
         onAskFinding={(finding) => openTopic(findingTopic(finding))}
         onSetupApply={(card, selectedId) => {
           const cohort = card.cohorts?.find((c) => c.id === selectedId);
@@ -1286,6 +1527,7 @@ export default function CampaignCreationOverlay({
         setEnabledAgents={setEnabledAgents}
         onCloseInterface={() => {
           audienceChat.current = false;
+          setGoalApprovalOpen(false);
           setChatOpen(false);
           setChatTopic(null);
           setChatVariant("campaigns");
@@ -1357,8 +1599,18 @@ export default function CampaignCreationOverlay({
           content={content}
           schedule={schedule}
           onBack={() => setPreviewOpen(false)}
-          onPublish={onClose}
+          onPublish={prefill || isPushChannel ? () => setLaunching(true) : onClose}
+          publishLabel={prefill ? (prefill.sendAt ? "Schedule campaign" : "Launch campaign") : undefined}
           onEditStep={(stepId) => {
+            if (isPushChannel) {
+              // The stepper has its own Setup step; the preview's "Setup" card
+              // (tracking) lives there too, the rest map one-to-one.
+              const to = Math.max(0, PUSH_STEPS.findIndex((st) => st.id === (stepId === "schedule" ? "schedule" : stepId)));
+              setStepIndex(to);
+              setReachedIndex(PUSH_STEPS.length - 1);
+              setPreviewOpen(false);
+              return;
+            }
             setOpenStepIds((prev) => new Set(prev).add(stepId));
             setFocusStepId(stepId);
             setPreviewOpen(false);
@@ -1367,7 +1619,117 @@ export default function CampaignCreationOverlay({
           onAskFinding={(finding) => openTopic(findingTopic(finding))}
           chatOpen={chatOpen}
           chatSlot={chatColumn}
+          channel={channel}
+          pushDetails={prefill?.details}
         />
+      ) : isPushChannel ? (
+        <>
+          <PushCampaignNavbar
+            campaignName={campaignName}
+            aiGenerated={campaignAIGenerated}
+            icon={Icon}
+            isLastStep={stepIndex === PUSH_STEPS.length - 1}
+            onRenameCampaign={renameCampaign}
+            onAskCoMarketer={openFreshChat}
+            onFinishLater={onClose}
+            onNext={goNextPushStep}
+            onClose={onClose}
+          />
+          <CampaignCreationStepper
+            steps={PUSH_STEPS}
+            activeIndex={stepIndex}
+            reachedIndex={reachedIndex}
+            campaignId="1234"
+            lastSaved="just now"
+            onStepSelect={setStepIndex}
+          />
+          <div className="flex min-h-0 flex-1">
+          {/* Same 56px side inset as the navbar and step strip, so the cards sit
+              under the icon/"Setup" on the left and the close box on the right. */}
+          <div
+            ref={canvasRef}
+            className={cn(
+              "scroll-slim min-w-0 flex-1 overflow-y-auto py-6 pl-14",
+              chatOpen ? "pr-6" : "pr-14"
+            )}
+          >
+            {/* 3/4 of the canvas by default; with Cori docked the canvas is already
+                narrower, so the content takes all of it. */}
+            <div className={chatOpen ? "w-full" : "w-3/4"}>
+              {PUSH_STEPS[stepIndex].id === "setup" && (
+                // The old accordion rows for apps / tracking / conversion
+                // (CampaignAudienceStep part="setup") are parked for now.
+                <PushSetupStep
+                  campaignName={campaignName}
+                  onRename={renameCampaign}
+                  selectedApps={audience.selectedApps}
+                  onAppsChange={(selectedApps) => setAudience((a) => ({ ...a, selectedApps }))}
+                  appsError={
+                    appRequiredTried && audience.selectedApps.length === 0
+                      ? "Select at least one target app."
+                      : undefined
+                  }
+                  setup={setup}
+                  onSetupChange={(patch) => setSetup((st) => ({ ...st, ...patch }))}
+                  controlGroupEnabled={schedule.controlGroupEnabled}
+                  onControlGroupChange={(controlGroupEnabled) =>
+                    setSchedule((sc) => ({ ...sc, controlGroupEnabled }))
+                  }
+                  conversionEventError={
+                    conversionTried && setup.conversionTracking && !setup.conversionEvent.trim()
+                      ? "Conversion goal is not selected."
+                      : undefined
+                  }
+                />
+              )}
+              {PUSH_STEPS[stepIndex].id === "audience" && (
+                <CampaignAudienceStep
+                  onUseSegmentAgent={askGoalForSegment}
+                  part="flow"
+                  values={audience}
+                  highlight={audienceFlash}
+                  onChange={(patch) => setAudience((a) => ({ ...a, ...patch }))}
+                  tracking={{
+                    gaTracking: setup.gaTracking,
+                    conversionTracking: setup.conversionTracking,
+                    conversionEvent: setup.conversionEvent,
+                    conversionWindowValue: setup.conversionWindowValue,
+                    conversionWindowUnit: setup.conversionWindowUnit,
+                    revenueParameter: setup.revenueParameter,
+                    utmParameters: setup.utmParameters,
+                    keyValueParameters: setup.keyValueParameters,
+                    conversionPayloadParameters: setup.conversionPayloadParameters,
+                  }}
+                  onTrackingChange={(patch) => setSetup((st) => ({ ...st, ...patch }))}
+                  channel={channel}
+                  campaignName={campaignName}
+                />
+              )}
+              {PUSH_STEPS[stepIndex].id === "content" && (
+                <CampaignContentStep
+                  values={content}
+                  highlight={contentHighlight}
+                  onChange={(patch) => setContent((c) => ({ ...c, ...patch }))}
+                  reach={reachFor(audience)}
+                  aiGenerated={campaignAIGenerated}
+                  channel={channel}
+                  hasTargetApps={audience.selectedApps.length > 0}
+                />
+              )}
+              {PUSH_STEPS[stepIndex].id === "schedule" && (
+                <CampaignScheduleStep
+                  values={schedule}
+                  onChange={(patch) => setSchedule((sc) => ({ ...sc, ...patch }))}
+                  audienceCount={reachFor(audience)}
+                />
+              )}
+            </div>
+          </div>
+          {/* chatColumn carries py-3; the canvas beside it has py-6 — the extra 12px
+              here lines the panel's top and bottom up with the cards. */}
+          {chatOpen && <div className="flex h-full min-h-0 shrink-0 py-3 pr-14">{chatColumn}</div>}
+          </div>
+        </>
       ) : (
         <>
       <CampaignCreationNavbar
@@ -1524,6 +1886,7 @@ export default function CampaignCreationOverlay({
                         {step.id === "audience" && (
                           <div className="relative">
                             <CampaignAudienceStep
+                              onUseSegmentAgent={askGoalForSegment}
                               values={audience}
                               highlight={audienceFlash}
                               onChange={(patch) => setAudience((a) => ({ ...a, ...patch }))}
@@ -1641,6 +2004,7 @@ export default function CampaignCreationOverlay({
             />
           ) : activeStep.id === "audience" ? (
             <CampaignAudienceStep
+              onUseSegmentAgent={askGoalForSegment}
               values={audience}
               highlight={audienceFlash}
               onChange={(patch) => setAudience((a) => ({ ...a, ...patch }))}

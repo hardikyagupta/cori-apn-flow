@@ -25,6 +25,20 @@ import type { NodeInsightCardData, NodeInsightResponse } from '@/components/Node
 import type { JourneyProposalCardData } from '@/components/JourneyOptimizationProposalCard';
 import type { AudienceTestCardData } from '@/components/AudienceTestQuestionCard';
 import type { QuestionRecapEntry } from '@/components/campaigns/CoMarketerQuestionCard';
+import {
+  isPushCartPrompt,
+  STAGE_ONE_QUESTIONS,
+  STAGE_TWO_QUESTIONS,
+  PROMO_YES,
+  OPTIMIZER_RECOMMENDATION,
+  draftFrom,
+  prefillFrom,
+  type FlowAnswers,
+  type PushCartDraft,
+  type PushCampaignPrefill,
+  type PushFlowCard,
+  type PushFlowEvent,
+} from '@/data/pushCartFlow';
 import AgentSwitchDivider from './AgentSwitchDivider';
 import AgentThreadHeader from './AgentThreadHeader';
 import AvatarStack from './AvatarStack';
@@ -73,6 +87,7 @@ import type { LucideIcon } from 'lucide-react';
 import { playResponseCue, playToggleCue, playExpandCue } from '@/lib/playCue';
 import { ContentAgentSegmentAccordions } from './ContentAgentSegmentAccordions';
 import GeneratingLoader from './GeneratingLoader';
+import PushFlowCardView from '@/components/PushFlowCards';
 import { BorderBeam } from 'border-beam';
 import { welcomeCardBeamStyleBlock } from './welcomeCardBeamStyles';
 import DiscoveryBanners from './DiscoveryBanners';
@@ -186,6 +201,9 @@ export interface ChatMessageData {
   // bold question + plain answer per row — instead of a single joined
   // string, once a question (or short batch) has just been answered.
   questionRecap?: QuestionRecapEntry[];
+  // Cori's App Push cart flow — a Questions / notification draft / brief card
+  // attached under this message's text (see startPushCartFlow).
+  pushFlowCard?: PushFlowCard;
   // The goal-first conversation's "merge the test journey into main" CTA —
   // a prominent standalone button (not a CoMarketerQuestionCard, since
   // there's only one action, not a set of options) shown below this
@@ -301,6 +319,13 @@ interface ChatInterfaceProps {
   /** See ChatMessage's own doc — forwarded straight through to every
    *  message's audience-test question card. */
   onRespondAudienceTest?: (percent: number) => void;
+  /** A question card the host wants answered before anything is generated —
+   *  drawn above the composer, and the empty state stands down while it's up
+   *  (e.g. the Segment agent asking what the campaign is for). */
+  approvalCard?: React.ReactNode;
+  /** "Preview campaign" on Cori's App Push brief — the host opens the creation
+   *  wizard on its preview screen with this draft. */
+  onPreviewPushCampaign?: (prefill: PushCampaignPrefill) => void;
   /** Full prior transcript to resume onto (a persisted conversation the host
    *  page is restoring, e.g. Journey Builder's test-journey session) —
    *  replayed instantly (no re-typing animation, no thinking-timer restart)
@@ -503,7 +528,15 @@ const DockedBodySkeleton = ({
   );
 };
 
-const ChatInterface: React.FC<ChatInterfaceProps> = ({ onBotIconClick, enabledAgents, setEnabledAgents, onCloseInterface, initialExpanded = true, docked = false, conversationVariant = 'default', initialMessage, initialInsightCard, initialAgentChat, initialReviewCampaign, initialTopic, onReviewArtifact, artifactActionLabel, followUpTopic, followUpSeq = 0, onSetupApply, isSetupApplyApplied, appliedCohortId, starterChipSet, onAskFinding, emptyStateGreeting, emptyStatePlaceholder, onBeforeSend, onCreateTest, onUpdateTestSplit, onPostTestDecision, onRespondNodeInsight, onRespondAudienceTest, initialMessages, onMessagesChange, onMergeTestJourney }) => {
+const PUSH_LOADER_LABELS = {
+  questions: ['Reviewing cart activity...', 'Estimating app push reach...', 'Preparing a few questions...'],
+  draft: ['Finding the right template...', 'Writing the title and message...', 'Adding cart image and countdown...'],
+  delivery: ['Analyzing engagement patterns...', 'Sizing up customer segments...', 'Balancing conversion and profit...'],
+  brief: ['Estimating campaign reach...', 'Checking the best send window...', 'Assembling your brief...'],
+  reply: ['Reading your request...', 'Checking the campaign brief...', 'Putting a reply together...'],
+};
+
+const ChatInterface: React.FC<ChatInterfaceProps> = ({ onBotIconClick, enabledAgents, setEnabledAgents, onCloseInterface, initialExpanded = true, docked = false, conversationVariant = 'default', initialMessage, initialInsightCard, initialAgentChat, initialReviewCampaign, initialTopic, onReviewArtifact, artifactActionLabel, followUpTopic, followUpSeq = 0, onSetupApply, isSetupApplyApplied, appliedCohortId, starterChipSet, onAskFinding, emptyStateGreeting, emptyStatePlaceholder, onBeforeSend, onCreateTest, onUpdateTestSplit, onPostTestDecision, onRespondNodeInsight, onRespondAudienceTest, onPreviewPushCampaign, approvalCard, initialMessages, onMessagesChange, onMergeTestJourney }) => {
   const navigate = useNavigate();
   const { active: atmoActive } = useAtmosphere();
   // The scripted storyline this interface plays. Home (`/`) uses 'default';
@@ -2281,6 +2314,176 @@ The content has been updated across all channels to reflect your changes.`;
     mockMessageTimeoutRef.current = setTimeout(() => step(0), 500);
   };
 
+  // --- Cori App Push "cart recovery" flow ------------------------------------
+  // Typing "create an app push campaign for users who added products to their
+  // cart" in the campaigns chat plays this instead of CAMPAIGNS_FLOW: Cori asks
+  // Questions cards, drafts the notification on template 80006, shows a brief,
+  // and "Preview campaign" hands it to the creation wizard's preview screen.
+  // Pill labels shown above the composer while Cori works on the current turn —
+  // specific to the app push step instead of the generic insights ones.
+  const [coriLoaderLabels, setCoriLoaderLabels] = useState<string[] | null>(null);
+  // The Questions card in flight — docked above the composer (not in the thread)
+  // so it stays in line with the input, like the journey co-marketer's.
+  const [dockedQuestions, setDockedQuestions] = useState<Extract<PushFlowCard, { kind: 'questions' }> | null>(null);
+  const pushFlowRef = useRef<{ active: boolean; one: FlowAnswers; two: FlowAnswers; draft: PushCartDraft | null }>({
+    active: false, one: {}, two: {}, draft: null,
+  });
+
+  /** Thinking beat, then one Cori message (optionally carrying a flow card). */
+  const playCoriReply = (
+    reply: { content: string; pushFlowCard?: PushFlowCard },
+    reasoningSteps?: string[],
+    seconds = 3,
+    loaderLabels?: string[],
+  ) => {
+    const cori = marketingAgents.find(a => a.id === 'co-marketer');
+    setCoriLoaderLabels(loaderLabels ?? null);
+    const docked = reply.pushFlowCard?.kind === 'questions' ? reply.pushFlowCard : null;
+    setDockedQuestions(null);
+    setIsMockAgentChatActive(true);
+    isMockAgentChatActiveRef.current = true;
+    setIsGeneratingOutput(true);
+    setInputShimmer(true);
+    if (inputShimmerTimerRef.current) clearTimeout(inputShimmerTimerRef.current);
+    inputShimmerTimerRef.current = setTimeout(() => setInputShimmer(false), 30000);
+    const finish = () => {
+      setIsMockAgentChatActive(false);
+      isMockAgentChatActiveRef.current = false;
+      setIsGeneratingOutput(false);
+      clearInputShimmer();
+      setMockChatCompleted(true);
+      playResponseCue();
+      if (docked) {
+        setDockedQuestions(docked);
+        stickToBottomFor(2500);
+      }
+    };
+    setMessages(prev => [...prev, {
+      type: 'chat', isAI: true, content: '',
+      isThinkingState: true, thinkingDuration: seconds, reasoningSteps,
+      onAnimationComplete: () => {
+        window.setTimeout(() => {
+          setMessages(p => [...p, {
+            type: 'chat', isAI: true,
+            agentName: cori?.name,
+            avatarSrc: cori?.avatarSrc, avatarIcon: cori?.icon, avatarBgClass: cori?.colorClass,
+            content: reply.content,
+            pushFlowCard: docked ? undefined : reply.pushFlowCard,
+            hidePerformanceDashboard: true,
+            onAnimationComplete: finish,
+          }]);
+          stickToBottomFor(2500);
+        }, 650);
+      },
+    }]);
+    stickToBottomFor(2500);
+  };
+
+  const appendUserTurn = (turn: Partial<ChatMessageData> & { content: string }) => {
+    setMessages(prev => [...prev, { type: 'chat', isAI: false, onAnimationComplete: () => {}, ...turn }]);
+    setShowSuggestions(false);
+    setDynamicSuggestions(null);
+    resetFeedback();
+    setMockChatCompleted(false);
+    stickToBottomFor(2500);
+  };
+
+  const startPushCartFlow = (message: string) => {
+    pushFlowRef.current = { active: true, one: {}, two: {}, draft: null };
+    const sentMsgIndex = messages.length;
+    appendUserTurn({ content: message, navLabel: 'App push campaign' });
+    setTimeout(() => {
+      document.getElementById(`msg-${sentMsgIndex}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 80);
+    playCoriReply(
+      {
+        content: "Absolutely! Let's create an app push campaign to bring shoppers back to their carts.\n\nI want to make sure I understand what you're building before I draft anything. Could you tell me a bit more?",
+        pushFlowCard: { kind: 'questions', stage: 1, questions: STAGE_ONE_QUESTIONS },
+      },
+      ['Reviewing cart activity and estimating the potential app push audience to prepare a few relevant questions'],
+      3,
+      PUSH_LOADER_LABELS.questions,
+    );
+  };
+
+  const handlePushFlowFreeText = (message: string) => {
+    appendUserTurn({ content: message });
+    playCoriReply(
+      { content: "Noted. I can't apply free-form edits to the brief yet. Open Preview campaign and use Edit on any section to adjust it." },
+      undefined,
+      2,
+      PUSH_LOADER_LABELS.reply,
+    );
+  };
+
+  const handlePushFlowEvent = (event: PushFlowEvent) => {
+    const flow = pushFlowRef.current;
+    if (event.type === 'questions') {
+      setDockedQuestions(null);
+      const recap: QuestionRecapEntry[] = event.questions
+        .filter(q => q.id in event.answers)
+        .map(q => ({ title: q.title, answer: event.answers[q.id] ?? 'Skipped' }));
+      appendUserTurn({ content: '', questionRecap: recap });
+      if (event.stage === 1) {
+        flow.one = event.answers;
+        flow.draft = draftFrom(flow.one, {});
+        playCoriReply(
+          {
+            content: "Here's the notification I've drafted on the Coupon Expiry Reminder template. Edit the title, body, discount, image or countdown, then continue.",
+            pushFlowCard: { kind: 'content', draft: flow.draft, needsPromo: flow.one.promo === PROMO_YES },
+          },
+          ['Finding a suitable template and crafting the notification title and message, with the cart image and countdown timer'],
+          3,
+          PUSH_LOADER_LABELS.draft,
+        );
+        return;
+      }
+      flow.two = event.answers;
+      const base = flow.draft ?? draftFrom(flow.one, flow.two);
+      const picked = draftFrom(flow.one, flow.two);
+      const draft: PushCartDraft = { ...base, devices: picked.devices, sendMode: picked.sendMode, sendLabel: picked.sendLabel };
+      flow.draft = draft;
+      const optimizer = draft.sendMode === 'optimizer'
+        ? `<p>The send time optimizer recommends sending your campaign <strong>${OPTIMIZER_RECOMMENDATION.replace('Today, ', 'today at ')}</strong>, when shoppers with abandoned carts are most likely to engage.</p>\n\n`
+        : '';
+      playCoriReply(
+        {
+          content: `${optimizer}I've prepared your campaign brief. Review the details before proceeding.`,
+          pushFlowCard: { kind: 'brief', draft },
+        },
+        ['Resolving your audience and exclusions', 'Estimating reach', 'Assembling the brief'],
+        3,
+        PUSH_LOADER_LABELS.brief,
+      );
+      return;
+    }
+    if (event.type === 'content') {
+      flow.draft = event.draft;
+      appendUserTurn({ content: 'This notification looks good.' });
+      playCoriReply(
+        {
+          content: "Great. Now delivery. I'll ask about devices and timing.",
+          pushFlowCard: { kind: 'questions', stage: 2, questions: STAGE_TWO_QUESTIONS },
+        },
+        ['Analyzing purchase and engagement patterns to identify valuable customer segments and recommend a discount that balances conversion potential and profitability'],
+        2,
+        PUSH_LOADER_LABELS.delivery,
+      );
+      return;
+    }
+    if (event.type === 'changes') {
+      appendUserTurn({ content: 'Make changes with Cori' });
+      playCoriReply(
+        { content: 'Sure. Tell me what to change, or open Preview campaign and use Edit on any section.' },
+        undefined,
+        2,
+        PUSH_LOADER_LABELS.reply,
+      );
+      return;
+    }
+    onPreviewPushCampaign?.(prefillFrom(event.draft));
+  };
+
   // Deep-research narrative — a variant-agnostic story any co-marketer chat can
   // play (see DEEP_RESEARCH_TOPICS). A two-step topic opens with the Insights
   // agent's fast read + a "go deeper" chip, then the follow-up spins up the
@@ -2585,6 +2788,19 @@ The content has been updated across all channels to reflect your changes.`;
     if (deepResearchEditTitle) {
       handleDeepResearchFollowup(message);
       return;
+    }
+
+    // Cori's App Push cart-recovery conversation outranks the generic stories
+    // below — its prompt would otherwise match a deep-research opener.
+    if (conversationVariant === 'campaigns') {
+      if (isPushCartPrompt(message)) {
+        startPushCartFlow(message);
+        return;
+      }
+      if (pushFlowRef.current.active) {
+        handlePushFlowFreeText(message);
+        return;
+      }
     }
 
     // Variant-agnostic deep-research narrative — available from any co-marketer
@@ -4321,7 +4537,7 @@ The content has been updated across all channels to reflect your changes.`;
                   // the banner sits at the bottom.
                   messages.length === 0 ? "my-auto" : ""
                 )}>
-                {messages.length === 0 && !isGeneratingOutput && (
+                {messages.length === 0 && !isGeneratingOutput && !approvalCard && (
                   <div className="w-full flex flex-col items-center">
                     <div className={cn("w-full flex flex-col gap-[32px] items-center", isExpanded ? "max-w-[768px]" : "max-w-full")}>
                       {/* Greeting — single line ("Good afternoon, Amit"), unless
@@ -4759,6 +4975,8 @@ The content has been updated across all channels to reflect your changes.`;
                           : undefined
                       }
                       questionRecap={message.questionRecap}
+                      pushFlowCard={message.pushFlowCard}
+                      onPushFlowEvent={handlePushFlowEvent}
                       onAskFinding={onAskFinding}
                       onThumbsUp={() => setFeedbackModal('up')}
                       onThumbsDown={() => setFeedbackModal('down')}
@@ -4876,7 +5094,7 @@ The content has been updated across all channels to reflect your changes.`;
                     the bottom of the empty-state page. The greeting/composer above
                     uses my-auto to stay centred; this sits below it with a bottom
                     gap. Content lives in DiscoveryBanners.tsx. */}
-                {messages.length === 0 && !isGeneratingOutput && (
+                {messages.length === 0 && !isGeneratingOutput && !approvalCard && (
                   <div className="w-full flex justify-center pt-[32px] pb-[24px]">
                     <DiscoveryBanners className="w-full" onActivate={handleDiscoveryBanner} />
                   </div>
@@ -4893,7 +5111,7 @@ The content has been updated across all channels to reflect your changes.`;
             )}
 
 
-            {messages.length > 0 && (
+            {(messages.length > 0 || approvalCard) && (
               <div className={cn(
                 "relative flex-shrink-0",
                 // Match the messages scroll area's horizontal padding so the input
@@ -4944,6 +5162,21 @@ The content has been updated across all channels to reflect your changes.`;
                     )}
                   </div>
                 )}
+                {/* Cori's follow-up Questions card, in line with the input field */}
+                {/* A question the host needs answered first — same spot, same width
+                    as the app push flow's own Questions card. */}
+                {approvalCard && (
+                  <div className={cn("flex w-full justify-center", isExpanded ? "pb-2" : "pb-3")}>
+                    <div className={cn(isExpanded ? "w-full max-w-[768px]" : "w-full")}>{approvalCard}</div>
+                  </div>
+                )}
+                {dockedQuestions && (
+                  <div className={cn("flex w-full justify-center", isExpanded ? "pb-2" : "pb-3")}>
+                    <div className={cn(isExpanded ? "w-full max-w-[768px]" : "w-full")}>
+                      <PushFlowCardView key={`${dockedQuestions.stage}`} card={dockedQuestions} onEvent={handlePushFlowEvent} />
+                    </div>
+                  </div>
+                )}
                 {/* Centered container for chat input - 768px width as per Figma */}
                 <div className={cn(
                   "flex items-center justify-center w-full bg-transparent outline-none",
@@ -4956,7 +5189,7 @@ The content has been updated across all channels to reflect your changes.`;
                     {/* Floating "still loading" pill, centered just above the input (both views) */}
                     {isGeneratingOutput && (
                       <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-[10px] z-20">
-                        <GeneratingLoader pill />
+                        <GeneratingLoader pill labels={conversationVariant === 'campaigns' && pushFlowRef.current.active ? coriLoaderLabels ?? undefined : undefined} />
                       </div>
                     )}
 

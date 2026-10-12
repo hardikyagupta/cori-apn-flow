@@ -12,16 +12,19 @@ export const loaderLabels = [
 
 // `pill`: floating white pill (rounded, grey outline, shadow) — used in the
 // collapse view as a "still loading" nudge centered above the input field.
-const GeneratingLoader: React.FC<{ pill?: boolean }> = ({ pill = false }) => {
+const GeneratingLoader: React.FC<{ pill?: boolean; labels?: string[] }> = ({ pill = false, labels = loaderLabels }) => {
   const [labelIndex, setLabelIndex] = useState(0);
+
+  // A new set of labels starts again from its first one.
+  useEffect(() => setLabelIndex(0), [labels]);
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setLabelIndex((prev) => (prev + 1) % loaderLabels.length);
+      setLabelIndex((prev) => (prev + 1) % labels.length);
     }, 1500);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [labels]);
 
   const content = (
     <>
@@ -33,7 +36,7 @@ const GeneratingLoader: React.FC<{ pill?: boolean }> = ({ pill = false }) => {
         />
       </div>
       <span className="text-sm thinking-shimmer-gradient whitespace-nowrap">
-        {loaderLabels[labelIndex]}
+        {labels[labelIndex] ?? labels[0]}
       </span>
     </>
   );

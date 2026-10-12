@@ -21,6 +21,8 @@ import type { Finding } from '@/components/campaigns/campaign-creation/previewFi
 import ExperimentCard, { type ExperimentCardData, type TestBranchConfig } from '@/components/ExperimentCard';
 import NodeOptimizationInsightCard, { type NodeInsightCardData, type NodeInsightResponse } from '@/components/NodeOptimizationInsightCard';
 import JourneyOptimizationProposalCard, { type JourneyProposalCardData } from '@/components/JourneyOptimizationProposalCard';
+import PushFlowCardView from '@/components/PushFlowCards';
+import type { PushFlowCard, PushFlowEvent } from '@/data/pushCartFlow';
 import AudienceTestQuestionCard, { type AudienceTestCardData } from '@/components/AudienceTestQuestionCard';
 import type { InsightCardContext } from '@/types/insightCard';
 import type { QuestionRecapEntry } from '@/components/campaigns/CoMarketerQuestionCard';
@@ -527,6 +529,9 @@ interface ChatMessageProps {
   isExpanded?: boolean;
   insightCard?: InsightCardContext;
   questionRecap?: QuestionRecapEntry[];
+  /** Cori's App Push cart flow — a Questions / draft / brief card under the text. */
+  pushFlowCard?: PushFlowCard;
+  onPushFlowEvent?: (event: PushFlowEvent) => void;
 }
 
 const ChatMessage: React.FC<ChatMessageProps> = ({
@@ -608,6 +613,8 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
   onThumbsDown,
   insightCard,
   questionRecap,
+  pushFlowCard,
+  onPushFlowEvent,
 }) => {
   const [displayedText, setDisplayedText] = useState('');
   const [isAnimationDone, setIsAnimationDone] = useState(false);
@@ -1615,6 +1622,11 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
                   // rather than the agent "then" asking it.
                   <div className="py-2 duration-500 delay-500 ease-out animate-in fade-in slide-in-from-bottom-2 fill-mode-both">
                     <AudienceTestQuestionCard data={audienceTestCard} onSubmit={onRespondAudienceTest} />
+                  </div>
+                )}
+                {pushFlowCard && onPushFlowEvent && isAnimationDone && (
+                  <div className="py-2 duration-500 delay-300 ease-out animate-in fade-in slide-in-from-bottom-2 fill-mode-both">
+                    <PushFlowCardView card={pushFlowCard} onEvent={onPushFlowEvent} />
                   </div>
                 )}
                 {mergeTestCta && isAnimationDone && (

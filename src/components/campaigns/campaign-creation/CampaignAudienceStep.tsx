@@ -4,6 +4,8 @@ import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 import * as SwitchPrimitives from "@radix-ui/react-switch";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import sparkleAi from "/campaign-assets/ic-sparkle-ai.gif";
+import { Switch } from "@/components/ui/switch";
 import Dropdown from "../Dropdown";
 import SegmentSelect, { type SegmentRef } from "./SegmentSelect";
 import StepCard from "./StepCard";
@@ -54,6 +56,9 @@ export interface AudienceValues {
   cohortId: string;
   /** Push only — which registered apps this send targets. */
   selectedApps: string[];
+  /** Push only — one notification to each user's latest active device, or to
+   *  every active device they have. */
+  deviceTargeting: "all" | "latest";
 }
 
 export const EMPTY_AUDIENCE: AudienceValues = {
@@ -66,6 +71,7 @@ export const EMPTY_AUDIENCE: AudienceValues = {
   excludeSegments: [],
   cohortId: "",
   selectedApps: [],
+  deviceTargeting: "all",
 };
 
 /** Reachable base for "All contacts" — everyone with a valid email address. */
@@ -424,6 +430,43 @@ export function reachFor(v: AudienceValues): number {
  * and proposes cohorts; picking one plots straight into these fields, which is
  * why everything here is editable afterwards rather than read-only.
  */
+/**
+ * The standing offer to have the audience built for you. It is not a fifth
+ * mode: it never selects one, it hands the brief to the Segment agent in the
+ * co-marketer and plots whichever cut you pick onto the fields below — so it
+ * sits above the card instead of among the radios. Fixed copy on purpose: a
+ * heading that rewrites itself would make the same control look like a
+ * different one each time you glance at it.
+ */
+function SegmentAgentBanner({ onUse }: { onUse: () => void }) {
+  return (
+    <div className="relative mb-4 w-full overflow-hidden rounded-lg border border-[#DDE2EE] bg-white p-4">
+      {/* Rotating ring drawn over the hairline border, so the offer reads as
+          live without the card jumping when it starts. */}
+      <span className="agent-offer-shimmer" aria-hidden />
+      <div className="relative z-[1] flex flex-wrap items-center gap-4">
+        <img src={sparkleAi} alt="" className="h-7 w-7 shrink-0" />
+        <div className="min-w-[220px] flex-1">
+          <p className="font-manrope text-sm font-bold text-[#17173A]">
+            Let the Segment agent build this audience
+          </p>
+          <p className="mt-0.5 font-manrope text-xs leading-[18px] text-[#6F6F8D]">
+            Tell it what this campaign is for and it scores your contacts against that goal, then plots
+            the cut you pick onto the fields below.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onUse}
+          className="btn-ai-gradient shrink-0 rounded-md px-4 py-2 font-manrope text-[13px] font-semibold"
+        >
+          <span className="relative z-[1]">Build with Audience agent</span>
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function CampaignAudienceStep({
   values,
   onChange,
@@ -435,6 +478,8 @@ export default function CampaignAudienceStep({
   campaignName,
   appsError,
   conversionEventError,
+  part = "all",
+  onUseSegmentAgent,
 }: {
   values: AudienceValues;
   onChange: (patch: Partial<AudienceValues>) => void;
@@ -453,6 +498,13 @@ export default function CampaignAudienceStep({
   /** Red message under Event name — set when Done was tried with conversion
    *  tracking on but no goal picked. */
   conversionEventError?: string;
+  /** Which half of the step to draw. App Push's stepper splits it in two —
+   *  "setup" is target apps + tracking + conversion goal, "audience" is who
+   *  gets it and who's excluded. Everything else draws "all". */
+  part?: "all" | "setup" | "audience" | "flow";
+  /** Hands the audience to the Segment agent — the host opens the co-marketer
+   *  on its questions. When omitted the banner isn't shown. */
+  onUseSegmentAgent?: () => void;
 }) {
   // Collapses the filter-mode tabs (and whichever one's fields) once the user
   // has them set up, without losing the picked mode — reopened from the same
@@ -488,94 +540,11 @@ export default function CampaignAudienceStep({
     setCondition(index, current.type === a.type ? { attribute: a.label, count: undefined } : next);
   };
 
-  return (
-    <StepCard full>
-      {channel !== "Email" && (
-        <div className="mb-6">
-          <MultiSelectDropdown
-            label="Target app(s)"
-            required
-            options={APP_OPTIONS}
-            value={values.selectedApps}
-            onChange={(selectedApps) => onChange({ selectedApps })}
-            error={appsError}
-          />
-        </div>
-      )}
-      <div>
-        <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
-          <button
-            type="button"
-            onClick={() => onChange({ mode: values.mode === "all" ? "segments" : values.mode })}
-            className="flex items-center gap-2.5 text-left"
-          >
-            <Radio checked={values.mode !== "all"} />
-            <span
-              className={cn(
-                "font-manrope text-sm text-[#17173A]",
-                values.mode !== "all" ? "font-semibold" : "font-medium"
-              )}
-            >
-              Filter by
-            </span>
-          </button>
-          <button
-            type="button"
-            onClick={() => onChange({ mode: "all" })}
-            className="flex items-center gap-2.5 text-left"
-          >
-            <Radio checked={values.mode === "all"} />
-            <span
-              className={cn(
-                "font-manrope text-sm text-[#17173A]",
-                values.mode === "all" ? "font-semibold" : "font-medium"
-              )}
-            >
-              All contacts
-            </span>
-          </button>
-        </div>
-
-        {values.mode !== "all" && (
-          <div className="mt-4 flex items-start gap-2">
-            <button
-              type="button"
-              aria-label={filterExpanded ? "Collapse filter" : "Expand filter"}
-              aria-expanded={filterExpanded}
-              onClick={() => setFilterExpanded((v) => !v)}
-              className="mt-1.5 grid size-5 shrink-0 place-items-center rounded text-[#8A8AA3] transition-colors hover:bg-[#F0F3F9] hover:text-[#17173A]"
-            >
-              <ChevronDown
-                className={cn("size-4 transition-transform", !filterExpanded && "-rotate-90")}
-                strokeWidth={2}
-              />
-            </button>
-            <div className="min-w-0 flex-1">
-              <div className="inline-flex">
-                {FILTER_MODES.map((m, i) => {
-                  const active = values.mode === m.id;
-                  return (
-                    <button
-                      key={m.id}
-                      type="button"
-                      onClick={() => onChange({ mode: m.id })}
-                      className={cn(
-                        "border px-4 py-2 font-manrope text-sm font-medium transition-colors",
-                        i > 0 && "-ml-px",
-                        i === 0 && "rounded-l-md",
-                        i === FILTER_MODES.length - 1 && "rounded-r-md",
-                        active
-                          ? "relative z-[1] border-[#2F68E5] bg-[#F4F8FF] text-[#2F68E5]"
-                          : "border-[#DDE2EE] text-[#17173A] hover:bg-[#F7F9FC]"
-                      )}
-                    >
-                      {m.label}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {filterExpanded && values.mode === "segments" && (
+  /** The mode-specific fields — segments picker, ad-hoc conditions or a data
+   *  table — shared by the original Filter-by layout and the stepper's. */
+  const modeFields = (
+    <>
+              {values.mode === "segments" && (
                 <div className="mt-4">
                   <div className="mb-1.5 flex items-center gap-2">
                     <span className="shrink-0 font-manrope text-[13px] font-semibold text-[#6F6F8D]">
@@ -594,7 +563,7 @@ export default function CampaignAudienceStep({
                 </div>
               )}
 
-              {filterExpanded && values.mode === "adhoc" && (
+              {values.mode === "adhoc" && (
                 <div className="mt-4">
                   <div className={cn("space-y-2", highlight && "cmk-plot-flash")}>
                     {values.conditions.map((c, i) => (
@@ -690,7 +659,7 @@ export default function CampaignAudienceStep({
                 </div>
               )}
 
-              {filterExpanded && values.mode === "table" && (
+              {values.mode === "table" && (
                 <div className="mt-4 flex items-center gap-2">
                   <span className="shrink-0 font-manrope text-[13px] font-semibold text-[#6F6F8D]">
                     Contacts which are in
@@ -704,6 +673,242 @@ export default function CampaignAudienceStep({
                   />
                 </div>
               )}
+    </>
+  );
+
+  const [counting, setCounting] = useState(false);
+  const [counted, setCounted] = useState(false);
+
+  // App Push's stepper draws the audience step the way the campaign-creation
+  // reference does: a Target audience card with four radio options, then an
+  // Exclude contacts card with its own toggle.
+  if (part === "flow") {
+    const MODES: { id: AudienceMode; label: string }[] = [
+      { id: "all", label: "All contacts" },
+      { id: "segments", label: "Segments/Lists" },
+      { id: "adhoc", label: "Ad-hoc segment" },
+      { id: "table", label: "User data table" },
+    ];
+    return (
+      <>
+      {onUseSegmentAgent && <SegmentAgentBanner onUse={onUseSegmentAgent} />}
+      <div className="rounded-lg border border-[#DDE2EE] bg-white p-8">
+        <div className="flex items-start justify-between gap-6">
+          <div>
+            <h2 className="font-manrope text-base font-bold text-[#17173A]">Target audience</h2>
+            <p className="mt-1 font-manrope text-sm text-[#6F6F8D]">Select your target audience for the campaign</p>
+          </div>
+          <div className="flex shrink-0 items-center gap-3">
+            {counted && (
+              <span className="font-manrope text-sm text-[#6F6F8D]">
+                Reachable contacts{" "}
+                <span className="font-bold text-[#17173A]">{reachFor(values).toLocaleString("en-US")}</span>
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                setCounting(true);
+                window.setTimeout(() => {
+                  setCounting(false);
+                  setCounted(true);
+                }, 800);
+              }}
+              disabled={counting}
+              className="h-8 rounded border border-[#2F68E5] bg-white px-3 font-manrope text-xs font-semibold uppercase tracking-[0.42px] text-[#2F68E5] transition-colors hover:bg-[#F4F8FF] disabled:opacity-60"
+            >
+              {counting ? "Counting…" : "Get count"}
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-5 rounded-lg border border-[#DDE2EE] px-6 py-5">
+          <div role="radiogroup" aria-label="Target audience" className="flex flex-wrap items-center gap-x-8 gap-y-3">
+            {MODES.map((m) => (
+              <button
+                key={m.id}
+                type="button"
+                role="radio"
+                aria-checked={values.mode === m.id}
+                onClick={() => onChange({ mode: m.id })}
+                className="flex items-center gap-2.5 text-left"
+              >
+                <Radio checked={values.mode === m.id} />
+                <span
+                  className={cn(
+                    "font-manrope text-sm text-[#17173A]",
+                    values.mode === m.id ? "font-semibold" : "font-medium"
+                  )}
+                >
+                  {m.label}
+                </span>
+              </button>
+            ))}
+          </div>
+          {values.mode !== "all" && <div className="mt-5 border-t border-[#EEF1F7] pt-5">{modeFields}</div>}
+        </div>
+
+        <h2 className="mt-10 font-manrope text-base font-bold text-[#17173A]">Device targeting</h2>
+        <p className="mt-1 font-manrope text-sm text-[#6F6F8D]">
+          Choose whether each user receives the notification on their latest active device or on all of their
+          active devices. <a
+            href="https://cedocs.netcore.ai/docs/create-app-push#device-targeting"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[#2F9BE5] hover:underline"
+          >
+            Learn more
+          </a>
+        </p>
+        <div role="radiogroup" aria-label="Device targeting" className="mt-4 flex flex-wrap items-center gap-x-8 gap-y-3">
+          {(
+            [
+              { id: "all", label: "All active devices" },
+              { id: "latest", label: "Latest active device only" },
+            ] as const
+          ).map((d) => (
+            <button
+              key={d.id}
+              type="button"
+              role="radio"
+              aria-checked={values.deviceTargeting === d.id}
+              onClick={() => onChange({ deviceTargeting: d.id })}
+              className="flex items-center gap-2.5 text-left"
+            >
+              <Radio checked={values.deviceTargeting === d.id} />
+              <span
+                className={cn(
+                  "font-manrope text-sm text-[#17173A]",
+                  values.deviceTargeting === d.id ? "font-semibold" : "font-medium"
+                )}
+              >
+                {d.label}
+              </span>
+            </button>
+          ))}
+        </div>
+
+        <h2 className="mt-10 font-manrope text-base font-bold text-[#17173A]">Exclude contacts</h2>
+        <div className="mt-4 rounded-lg border border-[#DDE2EE] px-6 py-5">
+          <div className="flex items-center justify-between gap-6">
+            <p className="flex items-center gap-2 font-manrope text-sm font-semibold text-[#17173A]">
+              Exclude list/segment
+              <Info className="size-3.5 text-[#8A8AA3]" strokeWidth={2} aria-label="Contacts in these segments are held back even if they match your targeting." />
+            </p>
+            <Switch
+              checked={values.excludeEnabled}
+              onCheckedChange={(excludeEnabled) => onChange({ excludeEnabled })}
+              aria-label="Exclude list/segment"
+              className="data-[state=checked]:bg-[#00C48C]"
+            />
+          </div>
+          {values.excludeEnabled && (
+            <div className="mt-4">
+              <SegmentSelect
+                value={values.excludeSegments}
+                onChange={(excludeSegments) => onChange({ excludeSegments })}
+              />
+              <p className="mt-1.5 font-manrope text-xs text-[#6F6F8D]">Select upto 15 list / segment</p>
+            </div>
+          )}
+        </div>
+      </div>
+      </>
+    );
+  }
+
+  return (
+    <>
+    {onUseSegmentAgent && part !== "setup" && <SegmentAgentBanner onUse={onUseSegmentAgent} />}
+    <StepCard full>
+      {part !== "audience" && channel !== "Email" && (
+        <div className="mb-6">
+          <MultiSelectDropdown
+            label="Target app(s)"
+            required
+            options={APP_OPTIONS}
+            value={values.selectedApps}
+            onChange={(selectedApps) => onChange({ selectedApps })}
+            error={appsError}
+          />
+        </div>
+      )}
+      {part !== "setup" && (
+      <>
+      <div>
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
+          <button
+            type="button"
+            onClick={() => onChange({ mode: values.mode === "all" ? "segments" : values.mode })}
+            className="flex items-center gap-2.5 text-left"
+          >
+            <Radio checked={values.mode !== "all"} />
+            <span
+              className={cn(
+                "font-manrope text-sm text-[#17173A]",
+                values.mode !== "all" ? "font-semibold" : "font-medium"
+              )}
+            >
+              Filter by
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => onChange({ mode: "all" })}
+            className="flex items-center gap-2.5 text-left"
+          >
+            <Radio checked={values.mode === "all"} />
+            <span
+              className={cn(
+                "font-manrope text-sm text-[#17173A]",
+                values.mode === "all" ? "font-semibold" : "font-medium"
+              )}
+            >
+              All contacts
+            </span>
+          </button>
+        </div>
+
+        {values.mode !== "all" && (
+          <div className="mt-4 flex items-start gap-2">
+            <button
+              type="button"
+              aria-label={filterExpanded ? "Collapse filter" : "Expand filter"}
+              aria-expanded={filterExpanded}
+              onClick={() => setFilterExpanded((v) => !v)}
+              className="mt-1.5 grid size-5 shrink-0 place-items-center rounded text-[#8A8AA3] transition-colors hover:bg-[#F0F3F9] hover:text-[#17173A]"
+            >
+              <ChevronDown
+                className={cn("size-4 transition-transform", !filterExpanded && "-rotate-90")}
+                strokeWidth={2}
+              />
+            </button>
+            <div className="min-w-0 flex-1">
+              <div className="inline-flex">
+                {FILTER_MODES.map((m, i) => {
+                  const active = values.mode === m.id;
+                  return (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => onChange({ mode: m.id })}
+                      className={cn(
+                        "border px-4 py-2 font-manrope text-sm font-medium transition-colors",
+                        i > 0 && "-ml-px",
+                        i === 0 && "rounded-l-md",
+                        i === FILTER_MODES.length - 1 && "rounded-r-md",
+                        active
+                          ? "relative z-[1] border-[#2F68E5] bg-[#F4F8FF] text-[#2F68E5]"
+                          : "border-[#DDE2EE] text-[#17173A] hover:bg-[#F7F9FC]"
+                      )}
+                    >
+                      {m.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {filterExpanded && modeFields}
             </div>
           </div>
         )}
@@ -723,7 +928,11 @@ export default function CampaignAudienceStep({
           <p className="mt-1.5 font-manrope text-xs text-[#6F6F8D]">Select upto 15 list / segment</p>
         </div>
       </FilterSection>
+      </>
+      )}
 
+      {part !== "audience" && (
+      <>
       <FilterSection
         title="Include tracking parameters"
         badge={<GaConfigPill />}
@@ -821,6 +1030,9 @@ export default function CampaignAudienceStep({
         }
         onClose={() => setConversionGoalDrawerOpen(false)}
       />
+      </>
+      )}
     </StepCard>
+    </>
   );
 }
