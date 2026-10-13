@@ -3,6 +3,7 @@ import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
 import CoriQuestionsCard from "@/components/CoriQuestionsCard";
+import AudienceDraftCard from "@/components/campaigns/campaign-creation/AudienceDraftCard";
 import { appPushTemplates } from "@/components/campaigns/campaign-creation/appPushTemplates.data";
 import {
   COUNTDOWN_PREVIEW,
@@ -249,5 +250,6 @@ export default function PushFlowCardView({
         onEvent={onEvent}
       />
     );
+  if (card.kind === "audience") return <AudienceDraftCard draft={card.draft} />;
   return <BriefCard draft={card.draft} onEvent={onEvent} />;
 }

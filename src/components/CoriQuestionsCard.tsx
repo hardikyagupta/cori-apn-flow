@@ -55,7 +55,8 @@ export default function CoriQuestionsCard({
   const question = visible[index];
   const isLast = index >= total - 1 && index >= visible.length - 1;
   const picked = question ? answers[question.id] : undefined;
-  const pickedOther = !!picked && !question.options.includes(picked);
+  const multiPicks = question.multi && picked ? picked.split("\n").filter(Boolean) : [];
+  const pickedOther = !question.multi && !!picked && !question.options.includes(picked);
 
   // Re-opening an earlier question shows what was typed in its Other row.
   useEffect(() => {
@@ -75,7 +76,11 @@ export default function CoriQuestionsCard({
   if (!question) return null;
 
   const select = (value: string) => setAnswers((a) => ({ ...a, [question.id]: value }));
-  const choice = pickedOther || other.trim() ? other.trim() || picked || null : picked ?? null;
+  const choice = question.multi
+    ? [...multiPicks, ...(other.trim() ? [other.trim()] : [])].join("\n") || null
+    : pickedOther || other.trim()
+      ? other.trim() || picked || null
+      : picked ?? null;
   const canContinue = !!choice;
 
   const finish = (final: FlowAnswers) => {
@@ -149,16 +154,26 @@ export default function CoriQuestionsCard({
               {question.title}
             </h3>
 
-            <div role="radiogroup" aria-label={question.title} className="flex flex-col gap-1.5 px-4 py-2.5">
+            <div role={question.multi ? "group" : "radiogroup"} aria-label={question.title} className="flex flex-col gap-1.5 px-4 py-2.5">
               {question.options.map((opt) => {
-                const isSelected = picked === opt;
+                const isSelected = question.multi ? multiPicks.includes(opt) : picked === opt;
                 return (
                   <button
                     key={opt}
                     type="button"
-                    role="radio"
+                    role={question.multi ? "checkbox" : "radio"}
                     aria-checked={isSelected}
                     onClick={() => {
+                      if (question.multi) {
+                        // Toggle from the latest answers, not this render's copy —
+                        // two quick clicks must both land.
+                        setAnswers((a) => {
+                          const current = (a[question.id] ?? "").split("\n").filter(Boolean);
+                          const next = current.includes(opt) ? current.filter((o) => o !== opt) : [...current, opt];
+                          return { ...a, [question.id]: next.join("\n") };
+                        });
+                        return;
+                      }
                       setOther("");
                       select(opt);
                     }}
@@ -182,6 +197,7 @@ export default function CoriQuestionsCard({
                     value={other}
                     onChange={(e) => {
                       setOther(e.target.value);
+                      if (question.multi) return;
                       if (e.target.value.trim()) select(e.target.value.trim());
                     }}
                     onKeyDown={(e) => e.key === "Enter" && canContinue && advance(choice)}

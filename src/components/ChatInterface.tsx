@@ -28,6 +28,9 @@ import type { QuestionRecapEntry } from '@/components/campaigns/CoMarketerQuesti
 import {
   isPushCartPrompt,
   isChannelAskPrompt,
+  isCancelPrompt,
+  matchOption,
+  namedChannel,
   CHANNEL_QUESTIONS,
   CHANNEL_RECOMMENDATION,
   CHANNEL_YES,
@@ -42,11 +45,30 @@ import {
   draftFrom,
   prefillFrom,
   type FlowAnswers,
+  type FlowQuestion,
   type PushCartDraft,
   type PushCampaignPrefill,
   type PushFlowCard,
   type PushFlowEvent,
 } from '@/data/pushCartFlow';
+import {
+  isAudienceGoalPrompt,
+  FOCUS_QUESTION,
+  FOCUS_RECOVER,
+  INTEREST_QUESTION,
+  recencyQuestion,
+  CHECKOUT_QUESTION,
+  CHECKOUT_YES,
+  REACH_QUESTION,
+  HOLDBACK_QUESTION,
+  APPLY_QUESTION,
+  APPLY_YES,
+  buildAudienceDraft,
+  draftSentence,
+  holdbackSentence,
+  type AudienceAgentHost,
+  type AudienceAgentState,
+} from '@/data/audienceAgentFlow';
 import AgentSwitchDivider from './AgentSwitchDivider';
 import AgentThreadHeader from './AgentThreadHeader';
 import AvatarStack from './AvatarStack';
@@ -327,6 +349,10 @@ interface ChatInterfaceProps {
   /** See ChatMessage's own doc — forwarded straight through to every
    *  message's audience-test question card. */
   onRespondAudienceTest?: (percent: number) => void;
+  /** The wizard hosting this chat can have Cori build its audience in
+   *  conversation (see audienceAgentFlow). Without it, that prompt is just a
+   *  prompt. */
+  audienceAgent?: AudienceAgentHost;
   /** A question card the host wants answered before anything is generated —
    *  drawn above the composer, and the empty state stands down while it's up
    *  (e.g. the Segment agent asking what the campaign is for). */
@@ -537,6 +563,7 @@ const DockedBodySkeleton = ({
 };
 
 const PUSH_LOADER_LABELS = {
+  audience: ['Reading shopper behaviour...', 'Sizing the audience...', 'Checking suppression rules...'],
   channel: ['Comparing channel performance...', 'Checking engagement over 30 days...', 'Picking the best channel...'],
   questions: ['Reviewing cart activity...', 'Estimating app push reach...', 'Preparing a few questions...'],
   draft: ['Finding the right template...', 'Writing the title and message...', 'Adding cart image and countdown...'],
@@ -545,7 +572,7 @@ const PUSH_LOADER_LABELS = {
   reply: ['Reading your request...', 'Checking the campaign brief...', 'Putting a reply together...'],
 };
 
-const ChatInterface: React.FC<ChatInterfaceProps> = ({ onBotIconClick, enabledAgents, setEnabledAgents, onCloseInterface, initialExpanded = true, docked = false, conversationVariant = 'default', initialMessage, initialInsightCard, initialAgentChat, initialReviewCampaign, initialTopic, onReviewArtifact, artifactActionLabel, followUpTopic, followUpSeq = 0, onSetupApply, isSetupApplyApplied, appliedCohortId, starterChipSet, onAskFinding, emptyStateGreeting, emptyStatePlaceholder, onBeforeSend, onCreateTest, onUpdateTestSplit, onPostTestDecision, onRespondNodeInsight, onRespondAudienceTest, onPreviewPushCampaign, approvalCard, initialMessages, onMessagesChange, onMergeTestJourney }) => {
+const ChatInterface: React.FC<ChatInterfaceProps> = ({ onBotIconClick, enabledAgents, setEnabledAgents, onCloseInterface, initialExpanded = true, docked = false, conversationVariant = 'default', initialMessage, initialInsightCard, initialAgentChat, initialReviewCampaign, initialTopic, onReviewArtifact, artifactActionLabel, followUpTopic, followUpSeq = 0, onSetupApply, isSetupApplyApplied, appliedCohortId, starterChipSet, onAskFinding, emptyStateGreeting, emptyStatePlaceholder, onBeforeSend, onCreateTest, onUpdateTestSplit, onPostTestDecision, onRespondNodeInsight, onRespondAudienceTest, onPreviewPushCampaign, approvalCard, audienceAgent, initialMessages, onMessagesChange, onMergeTestJourney }) => {
   const navigate = useNavigate();
   const { active: atmoActive } = useAtmosphere();
   // The scripted storyline this interface plays. Home (`/`) uses 'default';
@@ -2340,7 +2367,7 @@ The content has been updated across all channels to reflect your changes.`;
 
   /** Thinking beat, then one Cori message (optionally carrying a flow card). */
   const playCoriReply = (
-    reply: { content: string; pushFlowCard?: PushFlowCard },
+    reply: { content: string; pushFlowCard?: PushFlowCard; inlineCard?: PushFlowCard },
     reasoningSteps?: string[],
     seconds = 3,
     loaderLabels?: string[],
@@ -2377,7 +2404,7 @@ The content has been updated across all channels to reflect your changes.`;
             agentName: cori?.name,
             avatarSrc: cori?.avatarSrc, avatarIcon: cori?.icon, avatarBgClass: cori?.colorClass,
             content: reply.content,
-            pushFlowCard: docked ? undefined : reply.pushFlowCard,
+            pushFlowCard: docked ? reply.inlineCard : reply.pushFlowCard,
             hidePerformanceDashboard: true,
             onAnimationComplete: finish,
           }]);
@@ -2395,6 +2422,220 @@ The content has been updated across all channels to reflect your changes.`;
     resetFeedback();
     setMockChatCompleted(false);
     stickToBottomFor(2500);
+  };
+
+  // --- Cori builds an audience in conversation ---------------------------------
+  // "I want to increase repeat purchases…" in the wizard's chat: Cori narrows the
+  // goal with a few questions while the Audience step updates beside it (see
+  // data/audienceAgentFlow). Only runs when the wizard hosts this chat.
+  const audFlowRef = useRef<{ active: boolean; state: AudienceAgentState }>({ active: false, state: {} });
+  // After "Explore other channels": the next message is expected to name a channel.
+  const awaitingChannelRef = useRef(false);
+
+  const askAudience = (
+    content: string,
+    stage: string,
+    question: FlowQuestion,
+    steps?: string[],
+    inlineCard?: PushFlowCard,
+  ) => {
+    playCoriReply(
+      { content, pushFlowCard: { kind: 'questions', stage, questions: [question] }, inlineCard },
+      steps,
+      steps ? 3 : 2,
+      PUSH_LOADER_LABELS.audience,
+    );
+  };
+
+  const startAudienceAgent = (message: string) => {
+    audFlowRef.current = { active: true, state: {} };
+    const sentMsgIndex = messages.length;
+    appendUserTurn({ content: message, navLabel: 'Audience' });
+    setTimeout(() => {
+      document.getElementById(`msg-${sentMsgIndex}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 80);
+    askAudience(
+      "We could focus on shoppers who haven't completed a purchase, encourage existing customers to buy again, or re-engage inactive customers.\n\nWhat would you like to focus on?",
+      'aud-focus',
+      FOCUS_QUESTION,
+      ['Reviewing your customers to see where repeat purchases and sales can grow'],
+    );
+  };
+
+  /** The marketer typed instead of tapping while a question card is waiting.
+   *  If the words amount to one of the options (or a custom answer the card
+   *  allows) take them as the answer; otherwise say what's needed and put the
+   *  card back — playCoriReply clears it, which would leave the flow stuck. */
+  const answerOrReDock = (message: string): boolean => {
+    const pending = dockedQuestions;
+    if (!pending) return false;
+    if (pending.questions.length === 1) {
+      const q = pending.questions[0];
+      const answer = q.multi ? null : matchOption(message, q.options) ?? (q.otherPlaceholder ? message.trim() : null);
+      if (answer) {
+        handlePushFlowEvent({ type: 'questions', stage: pending.stage, questions: pending.questions, answers: { [q.id]: answer } });
+        return true;
+      }
+    }
+    appendUserTurn({ content: message });
+    const q = pending.questions[0];
+    const ask = pending.questions.length === 1
+      ? `I still need an answer to "${q.title}". Pick one of the options below${q.otherPlaceholder || q.multi ? ', or type your own under Other' : ''}.`
+      : 'I still need your answers to the questions below before I can move on. Pick an option for each, or skip the ones you want to leave.';
+    playCoriReply({ content: ask, pushFlowCard: pending }, undefined, 2, PUSH_LOADER_LABELS.reply);
+    return true;
+  };
+
+  /** "cancel" / "start over" — drop whichever scripted flow is running. */
+  const cancelFlows = (message: string) => {
+    audFlowRef.current = { active: false, state: {} };
+    pushFlowRef.current = { active: false, one: {}, two: {}, draft: null };
+    awaitingChannelRef.current = false;
+    setDockedQuestions(null);
+    setDynamicSuggestions(null);
+    appendUserTurn({ content: message });
+    playCoriReply(
+      { content: "No problem, I've set that aside. Tell me what you'd like to do next, or carry on in the wizard yourself." },
+      undefined,
+      2,
+      PUSH_LOADER_LABELS.reply,
+    );
+  };
+
+  const handleAudienceFreeText = (message: string): boolean => {
+    // A brand-new request for another flow wins over the audience conversation.
+    if (!dockedQuestions && (isChannelAskPrompt(message) || isPushCartPrompt(message))) return false;
+    if (answerOrReDock(message)) return true;
+    appendUserTurn({ content: message });
+    playCoriReply(
+      { content: "I can't change the conditions from chat yet. Adjust them on the left yourself, or apply the audience when you're happy with it." },
+      undefined,
+      2,
+      PUSH_LOADER_LABELS.reply,
+    );
+    return true;
+  };
+
+  const handleAudienceEvent = (event: Extract<PushFlowEvent, { type: 'questions' }>) => {
+    const f = audFlowRef.current;
+    const say = (id: string) => (event.answers[id] ?? '').trim();
+    setDockedQuestions(null);
+
+    switch (event.stage) {
+      case 'aud-focus': {
+        const picked = say('focus');
+        appendUserTurn({ content: `${picked}.` });
+        if (picked === FOCUS_RECOVER) {
+          f.state.focus = picked;
+          askAudience(
+            "A good place to start is shoppers who have shown interest in products but haven't completed their purchase.\n\nWould you like to focus on shoppers who added products to their cart or those who viewed products without adding them?",
+            'aud-interest',
+            INTEREST_QUESTION,
+          );
+        } else {
+          // Only the lost-purchases route is built out so far — say so, and ask again.
+          askAudience(
+            "That's a good direction too. In this preview I can build the lost-purchases audience end to end, so let's start there.\n\nWhat would you like to focus on?",
+            'aud-focus',
+            FOCUS_QUESTION,
+          );
+        }
+        return;
+      }
+      case 'aud-interest': {
+        f.state.interest = say('interest');
+        appendUserTurn({ content: `${f.state.interest}.` });
+        askAudience(
+          f.state.interest === 'Viewed products'
+            ? 'How recently should they have viewed products?'
+            : f.state.interest === 'Both'
+              ? 'How recently should they have shown interest?'
+              : 'How recently should they have added products to their cart?',
+          'aud-recency',
+          recencyQuestion(f.state.interest),
+        );
+        return;
+      }
+      case 'aud-recency': {
+        f.state.recency = say('recency');
+        appendUserTurn({ content: `${f.state.recency}, and exclude users who have already checked out.` });
+        askAudience('Should we exclude users who have already completed checkout?', 'aud-checkout', CHECKOUT_QUESTION);
+        return;
+      }
+      case 'aud-checkout': {
+        f.state.excludeCheckout = say('checkout') === CHECKOUT_YES;
+        appendUserTurn({ content: say('checkout') });
+        // The Audience step on the left picks up the draft right away.
+        const first = buildAudienceDraft(f.state);
+        audienceAgent?.onDraft(first);
+        askAudience(
+          `${draftSentence(f.state)}\n\nHow should I balance reach and precision?`,
+          'aud-reach',
+          REACH_QUESTION,
+          undefined,
+          { kind: 'audience', draft: { ...first, status: 'draft' } },
+        );
+        return;
+      }
+      case 'aud-reach': {
+        f.state.reach = say('reach');
+        appendUserTurn({ content: `${f.state.reach}.` });
+        askAudience('Anyone I should hold back?', 'aud-holdback', HOLDBACK_QUESTION);
+        return;
+      }
+      case 'aud-holdback': {
+        const picks = say('holdback').split('\n').map(x => x.trim()).filter(Boolean);
+        f.state.holdbacks = picks;
+        appendUserTurn({ content: holdbackSentence(picks) });
+        const draft = buildAudienceDraft(f.state);
+        audienceAgent?.onDraft(draft);
+        const n = picks.length;
+        const done =
+          n === 0
+            ? "Done. I haven't added any exclusions and kept your existing audience conditions."
+            : n === 2
+              ? "Done. I've added both exclusions while keeping your existing audience conditions."
+              : `Done. I've added ${n === 1 ? 'the exclusion' : `all ${n} exclusions`} while keeping your existing audience conditions.`;
+        askAudience(
+          `${done}\n\nYour audience is ready. Review the conditions and estimated reach on the left. Would you like to apply this audience to your campaign?`,
+          'aud-apply',
+          APPLY_QUESTION,
+          undefined,
+          { kind: 'audience', draft: { ...draft, status: 'draft' } },
+        );
+        return;
+      }
+      case 'aud-apply': {
+        const choice = say('apply');
+        appendUserTurn({ content: `${choice}.` });
+        if (choice === APPLY_YES) {
+          audienceAgent?.onDecision('apply');
+          f.active = false;
+          setMessages(prev => {
+            const last = [...prev].map((m, i) => ({ m, i })).reverse().find(x => x.m.pushFlowCard?.kind === 'audience');
+            if (!last) return prev;
+            return prev.map((m, i) => i === last.i && m.pushFlowCard?.kind === 'audience'
+              ? { ...m, pushFlowCard: { ...m.pushFlowCard, draft: { ...m.pushFlowCard.draft, status: 'applied' as const } } }
+              : m);
+          });
+          playCoriReply(
+            { content: 'Your audience has been applied to the campaign. You can continue to the next step to configure your campaign content.' },
+            undefined,
+            2,
+            PUSH_LOADER_LABELS.audience,
+          );
+        } else {
+          audienceAgent?.onDecision('refine');
+          playCoriReply(
+            { content: "Sure. Tell me what you'd like to change, or adjust the conditions on the left and apply when you're ready." },
+            undefined,
+            2,
+            PUSH_LOADER_LABELS.reply,
+          );
+        }
+        return;
+      }
+    }
   };
 
   /** "I want to target users who added to cart but haven't checked out" — no
@@ -2436,7 +2677,38 @@ The content has been updated across all channels to reflect your changes.`;
     );
   };
 
-  const handlePushFlowFreeText = (message: string) => {
+  /** After "Explore other channels" the marketer names one in their own words. */
+  const handleChannelFollowup = (message: string): boolean => {
+    const named = namedChannel(message);
+    if (!named) return false;
+    awaitingChannelRef.current = false;
+    pushFlowRef.current = { active: true, one: {}, two: {}, draft: null };
+    appendUserTurn({ content: message });
+    if (named === 'push') {
+      playCoriReply(
+        {
+          content: "Great! Let's identify the right audience for this campaign.",
+          pushFlowCard: { kind: 'questions', stage: 1, questions: STAGE_ONE_QUESTIONS },
+        },
+        undefined,
+        2,
+        PUSH_LOADER_LABELS.questions,
+      );
+    } else {
+      playCoriReply(
+        {
+          content: "I can only build App Push campaigns end to end for now. Shall we continue with App Push for this audience?",
+          pushFlowCard: { kind: 'questions', stage: 0, questions: CHANNEL_QUESTIONS },
+        },
+        undefined,
+        2,
+        PUSH_LOADER_LABELS.channel,
+      );
+    }
+    return true;
+  };
+
+  const handlePushFlowFreeText = (message: string): boolean => {
     const flow = pushFlowRef.current;
     // A first draft is waiting on feedback: whatever the marketer says is the
     // brief for the next version, which replaces it.
@@ -2460,8 +2732,12 @@ The content has been updated across all channels to reflect your changes.`;
         3,
         PUSH_LOADER_LABELS.draft,
       );
-      return;
+      return true;
     }
+    if (answerOrReDock(message)) return true;
+    // Nothing is waiting on the marketer. Only edit requests belong to this flow;
+    // anything else is a new topic, so let the regular handlers have it.
+    if (!/\b(change|edit|update|make|shorter|longer|rewrite|replace|add|remove|tone|different|swap|fix)\b/i.test(message)) return false;
     appendUserTurn({ content: message });
     playCoriReply(
       { content: "Noted. I can't apply free-form edits to the brief yet. Open Preview campaign and use Edit on any section to adjust it." },
@@ -2469,10 +2745,15 @@ The content has been updated across all channels to reflect your changes.`;
       2,
       PUSH_LOADER_LABELS.reply,
     );
+    return true;
   };
 
   const handlePushFlowEvent = (event: PushFlowEvent) => {
     const flow = pushFlowRef.current;
+    if (event.type === 'questions' && typeof event.stage === 'string' && event.stage.startsWith('aud-')) {
+      handleAudienceEvent(event);
+      return;
+    }
     if (event.type === 'questions' && event.stage === 0) {
       setDockedQuestions(null);
       const picked = event.answers.channel ?? '';
@@ -2491,6 +2772,7 @@ The content has been updated across all channels to reflect your changes.`;
         // Nothing else is wired up for other channels yet, so say so plainly
         // and hand the conversation back rather than pretend to plan one.
         flow.active = false;
+        awaitingChannelRef.current = true;
         playCoriReply(
           { content: "Sure. Tell me which channel you'd like to look at and I'll start from there." },
           undefined,
@@ -2897,6 +3179,16 @@ The content has been updated across all channels to reflect your changes.`;
     // Cori's App Push cart-recovery conversation outranks the generic stories
     // below — its prompt would otherwise match a deep-research opener.
     if (conversationVariant === 'campaigns') {
+      if (audienceAgent && isAudienceGoalPrompt(message)) {
+        startAudienceAgent(message);
+        return;
+      }
+      if ((audFlowRef.current.active || pushFlowRef.current.active || awaitingChannelRef.current) && isCancelPrompt(message)) {
+        cancelFlows(message);
+        return;
+      }
+      if (audFlowRef.current.active && handleAudienceFreeText(message)) return;
+      if (awaitingChannelRef.current && handleChannelFollowup(message)) return;
       if (isChannelAskPrompt(message)) {
         startChannelAsk(message);
         return;
@@ -2905,10 +3197,7 @@ The content has been updated across all channels to reflect your changes.`;
         startPushCartFlow(message);
         return;
       }
-      if (pushFlowRef.current.active) {
-        handlePushFlowFreeText(message);
-        return;
-      }
+      if (pushFlowRef.current.active && handlePushFlowFreeText(message)) return;
     }
 
     // Variant-agnostic deep-research narrative — available from any co-marketer
