@@ -432,6 +432,7 @@ export default function PushContentStep({
   seed,
   draft,
   onDraftChange,
+  onCreateFresh,
 }: {
   values: ContentValues;
   onChange: (patch: Partial<ContentValues>) => void;
@@ -439,6 +440,8 @@ export default function PushContentStep({
    *  return to this step) still has it. */
   draft: RegularLayoutDraft;
   onDraftChange: (update: (d: RegularLayoutDraft) => RegularLayoutDraft) => void;
+  /** The marketer started a blank notification themselves. */
+  onCreateFresh?: () => void;
   /** A notification Cori drafted — fills the editor and opens it. */
   seed?: { title: string; message: string; media?: string; n: number } | null;
 }) {
@@ -467,6 +470,7 @@ export default function PushContentStep({
   // before (a template, an earlier draft) is not carried over.
   const startFresh = () => {
     setDraft(() => EMPTY_REGULAR_DRAFT);
+    onCreateFresh?.();
     setLayout("new");
     setEditing(true);
   };

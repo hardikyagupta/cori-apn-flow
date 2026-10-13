@@ -32,6 +32,7 @@ import CampaignCreationIntro from "./CampaignCreationIntro";
 import CampaignAIGenerating from "./CampaignAIGenerating";
 import CampaignLaunchingModal from "./CampaignLaunchingModal";
 import CampaignCreationStepper, { type Step } from "./CampaignCreationStepper";
+import { isPushDraftPatchApplied } from "./SetupApplyCard";
 import CampaignAIPanel, {
   isContentPatchApplied,
   isPatchApplied,
@@ -100,6 +101,7 @@ import PushCampaignNavbar from "./PushCampaignStepper";
 import PushSetupStep from "./PushSetupStep";
 import PushContentStep from "./PushContentStep";
 import { EMPTY_REGULAR_DRAFT, type RegularLayoutDraft } from "./PushRegularLayoutEditor";
+import { buildPushFindings } from "./pushFindings.data";
 import GoalApprovalCard, { type ApprovalQuestion } from "./GoalApprovalCard";
 import { describeApprovalAnswers } from "@/data/approvalTranscript";
 import type { AudienceAgentHost, AudienceDraft } from "@/data/audienceAgentFlow";
@@ -537,6 +539,8 @@ export default function CampaignCreationOverlay({
   // A notification Cori drafted on the Content step; `n` makes each one a new event.
   // The Regular layout notification written on the Content step (by hand or by Cori).
   const [pushDraft, setPushDraft] = useState<RegularLayoutDraft>(EMPTY_REGULAR_DRAFT);
+  // What Cori built for this App Push campaign, as opposed to set by hand.
+  const [coriMade, setCoriMade] = useState({ audience: false, content: false });
   const [contentSeed, setContentSeed] = useState<{ title: string; message: string; media?: string; n: number } | null>(null);
   const [chatTopic, setChatTopic] = useState<SeededTopic | null>(null);
   const [followUpTopic, setFollowUpTopic] = useState<SeededTopic | null>(null);
@@ -614,6 +618,7 @@ export default function CampaignCreationOverlay({
       setAudience(EMPTY_AUDIENCE);
       setContent(EMPTY_CONTENT);
       setPushDraft(EMPTY_REGULAR_DRAFT);
+      setCoriMade({ audience: false, content: false });
       setPreviewOpen(false);
       setStepIndex(0);
       setReachedIndex(0);
@@ -1276,6 +1281,7 @@ export default function CampaignCreationOverlay({
       if (decision !== "apply" || !pendingAudience.current) return;
       plotAudienceDraft(pendingAudience.current);
       pendingAudience.current = null;
+      setCoriMade((m) => ({ ...m, audience: true }));
     },
   };
 
@@ -1360,6 +1366,9 @@ export default function CampaignCreationOverlay({
         return t ? `${t.name} (Id: ${t.id})` : "Recommended template";
       }
       if (stp?.conversionEvent) return stp.conversionEvent;
+      const pp = action?.pushDraftPatch;
+      if (pp?.landing) return `Open the ${pp.landing.toLowerCase()} on tap`;
+      if (pp?.android?.buttons?.[0]?.label) return `Action button: ${pp.android.buttons[0].label}`;
       return undefined;
     };
 
@@ -1381,6 +1390,7 @@ export default function CampaignCreationOverlay({
             text: patchText(),
             contentPatch: action.contentPatch,
             schedulePatch: action.schedulePatch,
+            pushDraftPatch: action.pushDraftPatch,
             patch: action.setupPatch,
           }
         : undefined,
@@ -1401,6 +1411,12 @@ export default function CampaignCreationOverlay({
           } worth fixing before it goes out.`,
     findings,
   });
+
+  // A whole campaign built from Cori's brief has nothing for the review to flag;
+  // otherwise only the parts Cori built herself are left alone.
+  const pushAiMade = prefill
+    ? { timing: true, audience: true, content: true }
+    : { audience: coriMade.audience, content: coriMade.content && content.templateId === null };
 
   const handleAuditCampaign = () => {
     // An AI-built campaign was already drafted against the account's best-
@@ -1427,6 +1443,10 @@ export default function CampaignCreationOverlay({
         reply: EXCLUSIVE_DEALS_REVIEW_REPLY,
         findings: exclusiveDealsReviewFindings(),
       });
+      return;
+    }
+    if (isPushChannel) {
+      openTopic(auditTopic(buildPushFindings({ audience, content, schedule, draft: pushDraft, aiMade: pushAiMade })));
       return;
     }
     openTopic(auditTopic(buildFindings({ setup, audience, content, schedule })));
@@ -1480,7 +1500,12 @@ export default function CampaignCreationOverlay({
         audienceAgent={audienceAgentHost}
         contentAgent={
           isPushChannel && chatStepId === "content"
-            ? { onDraft: (d) => setContentSeed({ title: d.title, message: d.message, media: d.media, n: Date.now() }) }
+            ? {
+                onDraft: (d) => {
+                  setContentSeed({ title: d.title, message: d.message, media: d.media, n: Date.now() });
+                  setCoriMade((m) => ({ ...m, content: true }));
+                },
+              }
             : undefined
         }
         approvalCard={
@@ -1512,6 +1537,11 @@ export default function CampaignCreationOverlay({
           const cohort = card.cohorts?.find((c) => c.id === selectedId);
           if (cohort) {
             applyCohort(cohort);
+            return;
+          }
+          // App Push review: a change to the notification being drafted.
+          if (card.pushDraftPatch) {
+            setPushDraft((d) => ({ ...d, ...card.pushDraftPatch }));
             return;
           }
           // App Push: Cori's hand-off from Audience to the Content step.
@@ -1605,7 +1635,9 @@ export default function CampaignCreationOverlay({
           if (card.patch) applySetup(card.patch);
         }}
         isSetupApplyApplied={(card) =>
-          card.contentPatch
+          card.pushDraftPatch
+            ? isPushDraftPatchApplied(card.pushDraftPatch, pushDraft)
+            : card.contentPatch
             ? isContentPatchApplied(card.contentPatch, content)
             : card.schedulePatch
               ? isSchedulePatchApplied(card.schedulePatch, schedule)
@@ -1713,6 +1745,7 @@ export default function CampaignCreationOverlay({
           channel={channel}
           pushDetails={prefill?.details}
           customDraft={pushDraft}
+          aiMade={pushAiMade}
         />
       ) : isPushChannel ? (
         <>
@@ -1805,6 +1838,7 @@ export default function CampaignCreationOverlay({
                   seed={contentSeed}
                   draft={pushDraft}
                   onDraftChange={(update) => setPushDraft(update)}
+                  onCreateFresh={() => setCoriMade((m) => ({ ...m, content: false }))}
                   values={content}
                   onChange={(patch) => setContent((c) => ({ ...c, ...patch }))}
                 />
