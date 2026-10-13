@@ -29,6 +29,13 @@ import {
   isPushCartPrompt,
   isChannelAskPrompt,
   isCancelPrompt,
+  isCartReminderPrompt,
+  CART_REMINDER_V1,
+  PUSH_CONTENT_CTA,
+  CART_REMINDER_V2,
+  CART_V2_FEEDBACK,
+  isCartFeedbackPrompt,
+  type ContentAgentHost,
   matchOption,
   namedChannel,
   CHANNEL_QUESTIONS,
@@ -353,6 +360,8 @@ interface ChatInterfaceProps {
    *  conversation (see audienceAgentFlow). Without it, that prompt is just a
    *  prompt. */
   audienceAgent?: AudienceAgentHost;
+  /** On the wizard's Content step: lets Cori draft the notification into the editor. */
+  contentAgent?: ContentAgentHost;
   /** A question card the host wants answered before anything is generated —
    *  drawn above the composer, and the empty state stands down while it's up
    *  (e.g. the Segment agent asking what the campaign is for). */
@@ -572,7 +581,7 @@ const PUSH_LOADER_LABELS = {
   reply: ['Reading your request...', 'Checking the campaign brief...', 'Putting a reply together...'],
 };
 
-const ChatInterface: React.FC<ChatInterfaceProps> = ({ onBotIconClick, enabledAgents, setEnabledAgents, onCloseInterface, initialExpanded = true, docked = false, conversationVariant = 'default', initialMessage, initialInsightCard, initialAgentChat, initialReviewCampaign, initialTopic, onReviewArtifact, artifactActionLabel, followUpTopic, followUpSeq = 0, onSetupApply, isSetupApplyApplied, appliedCohortId, starterChipSet, onAskFinding, emptyStateGreeting, emptyStatePlaceholder, onBeforeSend, onCreateTest, onUpdateTestSplit, onPostTestDecision, onRespondNodeInsight, onRespondAudienceTest, onPreviewPushCampaign, approvalCard, audienceAgent, initialMessages, onMessagesChange, onMergeTestJourney }) => {
+const ChatInterface: React.FC<ChatInterfaceProps> = ({ onBotIconClick, enabledAgents, setEnabledAgents, onCloseInterface, initialExpanded = true, docked = false, conversationVariant = 'default', initialMessage, initialInsightCard, initialAgentChat, initialReviewCampaign, initialTopic, onReviewArtifact, artifactActionLabel, followUpTopic, followUpSeq = 0, onSetupApply, isSetupApplyApplied, appliedCohortId, starterChipSet, onAskFinding, emptyStateGreeting, emptyStatePlaceholder, onBeforeSend, onCreateTest, onUpdateTestSplit, onPostTestDecision, onRespondNodeInsight, onRespondAudienceTest, onPreviewPushCampaign, approvalCard, audienceAgent, contentAgent, initialMessages, onMessagesChange, onMergeTestJourney }) => {
   const navigate = useNavigate();
   const { active: atmoActive } = useAtmosphere();
   // The scripted storyline this interface plays. Home (`/`) uses 'default';
@@ -2367,7 +2376,7 @@ The content has been updated across all channels to reflect your changes.`;
 
   /** Thinking beat, then one Cori message (optionally carrying a flow card). */
   const playCoriReply = (
-    reply: { content: string; pushFlowCard?: PushFlowCard; inlineCard?: PushFlowCard },
+    reply: { content: string; pushFlowCard?: PushFlowCard; inlineCard?: PushFlowCard; setupApplyCard?: SetupApplyCardData },
     reasoningSteps?: string[],
     seconds = 3,
     loaderLabels?: string[],
@@ -2405,6 +2414,7 @@ The content has been updated across all channels to reflect your changes.`;
             avatarSrc: cori?.avatarSrc, avatarIcon: cori?.icon, avatarBgClass: cori?.colorClass,
             content: reply.content,
             pushFlowCard: docked ? reply.inlineCard : reply.pushFlowCard,
+            setupApplyCard: reply.setupApplyCard,
             hidePerformanceDashboard: true,
             onAnimationComplete: finish,
           }]);
@@ -2500,6 +2510,53 @@ The content has been updated across all channels to reflect your changes.`;
       2,
       PUSH_LOADER_LABELS.reply,
     );
+  };
+
+  /** Content step, "Cart reminder": Cori writes v1 and drops it into the editor. */
+  // 1 once v1 is on screen and waiting for feedback; 2 after v2.
+  const cartVersionRef = useRef(0);
+
+  const startCartReminder = (message: string) => {
+    cartVersionRef.current = 1;
+    const sentMsgIndex = messages.length;
+    appendUserTurn({ content: message, navLabel: 'Notification' });
+    setTimeout(() => {
+      document.getElementById(`msg-${sentMsgIndex}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 80);
+    playCoriReply(
+      {
+        content: `<p>Here’s a cart reminder to nudge shoppers to complete their purchase.</p>\n\n<p>Title: ${CART_REMINDER_V1.title}</p>\n\n<p>Message: ${CART_REMINDER_V1.message}</p>\n\n<p>I’ve filled in the fields on the left, and the preview shows how your notification will look. What would you like to change? I can refine the copy based on your feedback.</p>`,
+      },
+      ['Matching the cart reminder to your audience', 'Writing a short title and message', 'Filling in the notification editor'],
+      3,
+      PUSH_LOADER_LABELS.draft,
+    );
+    window.setTimeout(() => contentAgent?.onDraft({ ...CART_REMINDER_V1, version: 1 }), 3700);
+    // The feedback is offered as a one-tap reply rather than typed for them.
+    window.setTimeout(() => {
+      setDynamicSuggestions([CART_V2_FEEDBACK]);
+      setShowSuggestions(true);
+    }, 7500);
+  };
+
+  /** Feedback on v1: Cori writes v2 with the discount and the urgency. */
+  const startCartReminderV2 = (message: string) => {
+    cartVersionRef.current = 2;
+    setDynamicSuggestions(null);
+    const sentMsgIndex = messages.length;
+    appendUserTurn({ content: message, navLabel: 'Notification v2' });
+    setTimeout(() => {
+      document.getElementById(`msg-${sentMsgIndex}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 80);
+    playCoriReply(
+      {
+        content: `<p>I’ve updated the campaign to make it more urgent and highlight the discount.</p>\n\n<p>Title: ${CART_REMINDER_V2.title}</p>\n\n<p>Message: ${CART_REMINDER_V2.message}</p>\n\n<p>The discount is personalised for each customer, and I’ve added a sale banner to reinforce the offer. The editor and preview are updated.</p>`,
+      },
+      ['Reading your feedback', 'Adding the discount value and an ends-tonight deadline', 'Picking a sale banner'],
+      3,
+      PUSH_LOADER_LABELS.draft,
+    );
+    window.setTimeout(() => contentAgent?.onDraft({ ...CART_REMINDER_V2, version: 2 }), 3700);
   };
 
   const handleAudienceFreeText = (message: string): boolean => {
@@ -2619,7 +2676,15 @@ The content has been updated across all channels to reflect your changes.`;
               : m);
           });
           playCoriReply(
-            { content: 'Your audience has been applied to the campaign. You can continue to the next step to configure your campaign content.' },
+            {
+              content: "Your audience has been applied to the campaign. Next up is the notification itself. I can help you write the title and message.",
+              setupApplyCard: {
+                kind: 'cta',
+                title: PUSH_CONTENT_CTA,
+                applyLabel: 'Go to Content',
+                appliedLabel: 'Opening Content',
+              },
+            },
             undefined,
             2,
             PUSH_LOADER_LABELS.audience,
@@ -3179,6 +3244,14 @@ The content has been updated across all channels to reflect your changes.`;
     // Cori's App Push cart-recovery conversation outranks the generic stories
     // below — its prompt would otherwise match a deep-research opener.
     if (conversationVariant === 'campaigns') {
+      if (contentAgent && cartVersionRef.current === 1 && isCartFeedbackPrompt(message)) {
+        startCartReminderV2(message);
+        return;
+      }
+      if (contentAgent && isCartReminderPrompt(message)) {
+        startCartReminder(message);
+        return;
+      }
       if (audienceAgent && isAudienceGoalPrompt(message)) {
         startAudienceAgent(message);
         return;

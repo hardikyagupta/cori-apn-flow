@@ -1,5 +1,12 @@
 import { useRef, useState, type ReactNode } from "react";
-import { ArrowLeft, ArrowRight, Plus, Send, Trash2, UserRound } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Copy,
+  Plus,
+  Send,
+  Trash2,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
 import { DsButton } from "@/components/ui/ds-button";
@@ -83,6 +90,11 @@ const EMPTY_PLATFORM: PlatformConfig = {
   soundFile: "",
 };
 
+/** Has the marketer (or Cori) written anything into the notification yet? */
+export function hasDraftContent(d: RegularLayoutDraft): boolean {
+  return d.title.trim() !== "" || d.message.trim() !== "";
+}
+
 export const EMPTY_REGULAR_DRAFT: RegularLayoutDraft = {
   title: "",
   message: "",
@@ -95,16 +107,29 @@ export const EMPTY_REGULAR_DRAFT: RegularLayoutDraft = {
   addOnPairs: [{ key: "", value: "" }],
 };
 
-const LANDING_OPTIONS = ["App Homepage", "Product page", "Cart", "Offers", "Custom URL"];
+const LANDING_OPTIONS = [
+  "App Homepage",
+  "Product page",
+  "Cart",
+  "Offers",
+  "Custom URL",
+];
 const MAX_BUTTONS = 3;
 const MAX_PAIRS = 10;
-const IMAGE_URL = /^https:\/\/\S+\.(png|jpe?g)(\?\S*)?$/i;
+/** An https image link, or one of the app's own images (a root-relative path). */
+const IMAGE_URL = /^(https:\/\/|\/)\S+\.(png|jpe?g)(\?\S*)?$/i;
 
 /** Grey-filled field, same as the Setup step's inputs. */
 const fieldClass =
   "h-10 w-full rounded-md border border-transparent bg-[#F4F5F9] px-3 font-manrope text-sm text-[#17173A] outline-none transition-colors placeholder:text-[#8A8AA3] focus:border-[#2F68E5] focus:bg-white";
 
-function Label({ children, required }: { children: ReactNode; required?: boolean }) {
+function Label({
+  children,
+  required,
+}: {
+  children: ReactNode;
+  required?: boolean;
+}) {
   return (
     <p className="mb-1.5 font-manrope text-sm font-semibold text-[#17173A]">
       {children}
@@ -113,14 +138,30 @@ function Label({ children, required }: { children: ReactNode; required?: boolean
   );
 }
 
-function Radio({ checked, label, onSelect, name }: { checked: boolean; label: string; onSelect: () => void; name: string }) {
+function Radio({
+  checked,
+  label,
+  onSelect,
+  name,
+}: {
+  checked: boolean;
+  label: string;
+  onSelect: () => void;
+  name: string;
+}) {
   return (
     <label className="flex cursor-pointer items-center gap-2 font-manrope text-sm font-medium text-[#17173A]">
-      <input type="radio" name={name} checked={checked} onChange={onSelect} className="peer sr-only" />
+      <input
+        type="radio"
+        name={name}
+        checked={checked}
+        onChange={onSelect}
+        className="peer sr-only"
+      />
       <span
         className={cn(
           "grid size-5 shrink-0 place-items-center rounded-full border-2 transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-[#2F68E5] peer-focus-visible:ring-offset-2",
-          checked ? "border-[#2F68E5]" : "border-[#B8BFD3]"
+          checked ? "border-[#2F68E5]" : "border-[#B8BFD3]",
         )}
       >
         {checked && <span className="size-2.5 rounded-full bg-[#2F68E5]" />}
@@ -130,7 +171,17 @@ function Radio({ checked, label, onSelect, name }: { checked: boolean; label: st
   );
 }
 
-function Toggle({ checked, onChange, label, disabled }: { checked: boolean; onChange: (v: boolean) => void; label: string; disabled?: boolean }) {
+function Toggle({
+  checked,
+  onChange,
+  label,
+  disabled,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  label: string;
+  disabled?: boolean;
+}) {
   return (
     <Switch
       checked={checked}
@@ -160,25 +211,52 @@ function FeatureRow({
   children?: ReactNode;
 }) {
   return (
-    <div className={cn("border-t border-[#DDE2EE] px-6 py-6", disabled && "opacity-60")}>
+    <div
+      className={cn(
+        "border-t border-[#DDE2EE] px-6 py-6",
+        disabled && "opacity-60",
+      )}
+    >
       <div className="flex items-center justify-between gap-6">
         <p className="font-manrope text-sm font-semibold text-[#17173A]">
           {title}
-          {hint && <span className="ml-2 text-xs font-normal text-[#6F6F8D]">{hint}</span>}
+          {hint && (
+            <span className="ml-2 text-xs font-normal text-[#6F6F8D]">
+              {hint}
+            </span>
+          )}
         </p>
-        <Toggle checked={checked} onChange={onChange} label={title} disabled={disabled} />
+        <Toggle
+          checked={checked}
+          onChange={onChange}
+          label={title}
+          disabled={disabled}
+        />
       </div>
-      {checked && children && <div className="mt-6 flex flex-col gap-6">{children}</div>}
+      {checked && children && (
+        <div className="mt-6 flex flex-col gap-6">{children}</div>
+      )}
     </div>
   );
 }
 
-function ColorField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+function ColorField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+}) {
   return (
     <div className="w-[279px]">
       <Label>{label}</Label>
       <div className="flex h-10 items-center overflow-hidden rounded-md border border-[#DDE2EE] bg-white">
-        <label className="relative block h-full w-[93px] shrink-0 cursor-pointer" style={{ background: value }}>
+        <label
+          className="relative block h-full w-[93px] shrink-0 cursor-pointer"
+          style={{ background: value }}
+        >
           <input
             type="color"
             value={/^#[0-9a-f]{6}$/i.test(value) ? value : "#000000"}
@@ -210,7 +288,8 @@ function PlatformFields({
   set: (patch: Partial<PlatformConfig>) => void;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
-  const urlBad = cfg.mediaUrl.trim() !== "" && !IMAGE_URL.test(cfg.mediaUrl.trim());
+  const urlBad =
+    cfg.mediaUrl.trim() !== "" && !IMAGE_URL.test(cfg.mediaUrl.trim());
 
   const pickFile = (file: File | undefined) => {
     if (!file) return;
@@ -252,12 +331,23 @@ function PlatformFields({
               ["gif", "GIF"],
             ] as const
           ).map(([id, label]) => (
-            <Radio key={id} name={`${platform}-media-kind`} label={label} checked={cfg.mediaKind === id} onSelect={() => set({ mediaKind: id })} />
+            <Radio
+              key={id}
+              name={`${platform}-media-kind`}
+              label={label}
+              checked={cfg.mediaKind === id}
+              onSelect={() => set({ mediaKind: id })}
+            />
           ))}
         </div>
         <div className="border-t border-[#DDE2EE]" />
         <div className="flex flex-wrap gap-x-8 gap-y-3">
-          <Radio name={`${platform}-media-source`} label="URL" checked={cfg.mediaSource === "url"} onSelect={() => set({ mediaSource: "url" })} />
+          <Radio
+            name={`${platform}-media-source`}
+            label="URL"
+            checked={cfg.mediaSource === "url"}
+            onSelect={() => set({ mediaSource: "url" })}
+          />
           <Radio
             name={`${platform}-media-source`}
             label="Upload image"
@@ -270,18 +360,28 @@ function PlatformFields({
             <Label required>Media URL</Label>
             <div className="relative">
               <input
-                className={cn(fieldClass, "pr-10", urlBad && "border-[#E5484D] bg-white")}
+                className={cn(
+                  fieldClass,
+                  "pr-10",
+                  urlBad && "border-[#E5484D] bg-white",
+                )}
                 value={cfg.mediaUrl}
                 onChange={(e) => set({ mediaUrl: e.target.value })}
                 placeholder="https://website.com/image.png"
                 aria-invalid={urlBad}
               />
-              <UserRound className="pointer-events-none absolute right-3 top-1/2 size-5 -translate-y-1/2 text-[#6F6F8D]" aria-hidden />
+              <PersonalizeIcon className="pointer-events-none absolute right-3 top-1/2 size-5 -translate-y-1/2 text-[#6F6F8D]" />
             </div>
-            <p className={cn("mt-3 font-manrope text-xs leading-4", urlBad ? "text-[#E5484D]" : "text-[#6F6F8D]")}>
+            <p
+              className={cn(
+                "mt-3 font-manrope text-xs leading-4",
+                urlBad ? "text-[#E5484D]" : "text-[#6F6F8D]",
+              )}
+            >
               PNG, JPG &amp; JPEG file formats are supported.
               <br />
-              URL must include an HTTPS protocol ending with a supported file format (ex: https://website.com/image.png )
+              URL must include an HTTPS protocol ending with a supported file
+              format (ex: https://website.com/image.png )
             </p>
           </div>
         ) : (
@@ -298,13 +398,21 @@ function PlatformFields({
             />
             {cfg.mediaFile ? (
               <>
-                <p className="min-w-0 truncate font-manrope text-sm font-semibold text-[#17173A]">{cfg.mediaFile.name}</p>
-                <DsButton variant="link" onClick={() => fileRef.current?.click()}>
+                <p className="min-w-0 truncate font-manrope text-sm font-semibold text-[#17173A]">
+                  {cfg.mediaFile.name}
+                </p>
+                <DsButton
+                  variant="link"
+                  onClick={() => fileRef.current?.click()}
+                >
                   Change image
                 </DsButton>
               </>
             ) : (
-              <DsButton variant="secondary" onClick={() => fileRef.current?.click()}>
+              <DsButton
+                variant="secondary"
+                onClick={() => fileRef.current?.click()}
+              >
                 Upload image
               </DsButton>
             )}
@@ -312,9 +420,18 @@ function PlatformFields({
         )}
       </FeatureRow>
 
-      <FeatureRow title="Background colour" checked={cfg.background} onChange={(background) => set({ background })}>
+      <FeatureRow
+        title="Background colour"
+        checked={cfg.background}
+        onChange={(background) => set({ background })}
+      >
         <div className="flex flex-wrap gap-x-8 gap-y-3">
-          <Radio name={`${platform}-bg-mode`} label="Solid" checked={cfg.backgroundMode === "solid"} onSelect={() => set({ backgroundMode: "solid" })} />
+          <Radio
+            name={`${platform}-bg-mode`}
+            label="Solid"
+            checked={cfg.backgroundMode === "solid"}
+            onSelect={() => set({ backgroundMode: "solid" })}
+          />
           <Radio
             name={`${platform}-bg-mode`}
             label="Gradient"
@@ -323,14 +440,26 @@ function PlatformFields({
           />
         </div>
         <div className="flex flex-wrap gap-5">
-          <ColorField label="Colour" value={cfg.backgroundColor} onChange={(backgroundColor) => set({ backgroundColor })} />
+          <ColorField
+            label="Colour"
+            value={cfg.backgroundColor}
+            onChange={(backgroundColor) => set({ backgroundColor })}
+          />
           {cfg.backgroundMode === "gradient" && (
-            <ColorField label="Second colour" value={cfg.backgroundColor2} onChange={(backgroundColor2) => set({ backgroundColor2 })} />
+            <ColorField
+              label="Second colour"
+              value={cfg.backgroundColor2}
+              onChange={(backgroundColor2) => set({ backgroundColor2 })}
+            />
           )}
         </div>
       </FeatureRow>
 
-      <FeatureRow title="Action buttons" checked={cfg.actionButtons} onChange={(actionButtons) => set({ actionButtons })}>
+      <FeatureRow
+        title="Action buttons"
+        checked={cfg.actionButtons}
+        onChange={(actionButtons) => set({ actionButtons })}
+      >
         {cfg.buttons.map((b, i) => (
           <div key={i} className="flex items-end gap-3">
             <div className="min-w-0 flex-1">
@@ -339,7 +468,13 @@ function PlatformFields({
                 className={fieldClass}
                 value={b.label}
                 maxLength={20}
-                onChange={(e) => set({ buttons: cfg.buttons.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)) })}
+                onChange={(e) =>
+                  set({
+                    buttons: cfg.buttons.map((x, j) =>
+                      j === i ? { ...x, label: e.target.value } : x,
+                    ),
+                  })
+                }
                 placeholder="e.g. Shop now"
               />
             </div>
@@ -348,7 +483,13 @@ function PlatformFields({
               <input
                 className={fieldClass}
                 value={b.url}
-                onChange={(e) => set({ buttons: cfg.buttons.map((x, j) => (j === i ? { ...x, url: e.target.value } : x)) })}
+                onChange={(e) =>
+                  set({
+                    buttons: cfg.buttons.map((x, j) =>
+                      j === i ? { ...x, url: e.target.value } : x,
+                    ),
+                  })
+                }
                 placeholder="https://"
               />
             </div>
@@ -356,7 +497,9 @@ function PlatformFields({
               <button
                 type="button"
                 aria-label={`Remove button ${i + 1}`}
-                onClick={() => set({ buttons: cfg.buttons.filter((_, j) => j !== i) })}
+                onClick={() =>
+                  set({ buttons: cfg.buttons.filter((_, j) => j !== i) })
+                }
                 className="grid size-10 shrink-0 cursor-pointer place-items-center rounded-md text-[#6F6F8D] hover:bg-[#F4F5F9]"
               >
                 <Trash2 className="size-4" />
@@ -365,20 +508,39 @@ function PlatformFields({
           </div>
         ))}
         {cfg.buttons.length < MAX_BUTTONS && (
-          <DsButton variant="link" className="self-start" onClick={() => set({ buttons: [...cfg.buttons, { label: "", url: "" }] })}>
+          <DsButton
+            variant="link"
+            className="self-start"
+            onClick={() =>
+              set({ buttons: [...cfg.buttons, { label: "", url: "" }] })
+            }
+          >
             <Plus /> Add button
           </DsButton>
         )}
       </FeatureRow>
 
       {platform === "android" && (
-        <FeatureRow title="Enable sticky notification" checked={cfg.sticky} onChange={(sticky) => set({ sticky })} />
+        <FeatureRow
+          title="Enable sticky notification"
+          checked={cfg.sticky}
+          onChange={(sticky) => set({ sticky })}
+        />
       )}
 
       {/* Greyed out in every frame of the design — collapsed-state styling isn't wired up yet. */}
-      <FeatureRow title="Customize collapsed state" checked={false} onChange={() => {}} disabled />
+      <FeatureRow
+        title="Customize collapsed state"
+        checked={false}
+        onChange={() => {}}
+        disabled
+      />
 
-      <FeatureRow title="Sound" checked={cfg.sound} onChange={(sound) => set({ sound })}>
+      <FeatureRow
+        title="Sound"
+        checked={cfg.sound}
+        onChange={(sound) => set({ sound })}
+      >
         <div>
           <Label>Sound file name</Label>
           <input
@@ -390,6 +552,26 @@ function PlatformFields({
         </div>
       </FeatureRow>
     </>
+  );
+}
+
+/** The personalisation glyph: a person inside a scan frame. */
+function PersonalizeIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden
+    >
+      <path d="M3 8V6a3 3 0 0 1 3-3h2M16 3h2a3 3 0 0 1 3 3v2M21 16v2a3 3 0 0 1-3 3h-2M8 21H6a3 3 0 0 1-3-3v-2" />
+      <circle cx="12" cy="10" r="2.6" />
+      <path d="M7.4 17.2c.8-2.1 2.4-3.2 4.6-3.2s3.8 1.1 4.6 3.2" />
+    </svg>
   );
 }
 
@@ -409,25 +591,58 @@ function mediaSrc(cfg: PlatformConfig): string | null {
 }
 
 /** Title, subtitle, message and the action buttons — shared by every card. */
-function NotificationText({ draft, cfg, compact }: { draft: RegularLayoutDraft; cfg: PlatformConfig; compact?: boolean }) {
+function NotificationText({
+  draft,
+  cfg,
+  compact,
+}: {
+  draft: RegularLayoutDraft;
+  cfg: PlatformConfig;
+  compact?: boolean;
+}) {
   return (
     <div className="min-w-0 flex-1 break-words text-black">
       {draft.title && (
-        <p className={cn("font-manrope font-semibold leading-[1.2] tracking-[0.29px]", compact ? "text-[13px]" : "text-sm")}>{draft.title}</p>
+        <p
+          className={cn(
+            "font-manrope font-semibold leading-[1.2] tracking-[0.29px]",
+            compact ? "text-[13px]" : "text-sm",
+          )}
+        >
+          {draft.title}
+        </p>
       )}
-      {cfg.subtitle && cfg.subtitleText && <p className="font-manrope text-xs font-medium leading-[1.3]">{cfg.subtitleText}</p>}
-      {draft.message && <p className={cn("font-manrope leading-[1.3] tracking-[0.25px]", compact ? "text-[11px]" : "text-xs")}>{draft.message}</p>}
+      {cfg.subtitle && cfg.subtitleText && (
+        <p className="font-manrope text-xs font-medium leading-[1.3]">
+          {cfg.subtitleText}
+        </p>
+      )}
+      {draft.message && (
+        <p
+          className={cn(
+            "font-manrope leading-[1.3] tracking-[0.25px]",
+            compact ? "text-[11px]" : "text-xs",
+          )}
+        >
+          {draft.message}
+        </p>
+      )}
     </div>
   );
 }
 
 function ActionRow({ cfg }: { cfg: PlatformConfig }) {
-  const buttons = cfg.actionButtons ? cfg.buttons.filter((b) => b.label.trim()) : [];
+  const buttons = cfg.actionButtons
+    ? cfg.buttons.filter((b) => b.label.trim())
+    : [];
   if (buttons.length === 0) return null;
   return (
     <div className="flex gap-4 border-t border-[#DDE2EE] px-[15px] py-2">
       {buttons.map((b, i) => (
-        <span key={i} className="font-manrope text-xs font-bold uppercase tracking-[0.4px] text-[#2F68E5]">
+        <span
+          key={i}
+          className="font-manrope text-xs font-bold uppercase tracking-[0.4px] text-[#2F68E5]"
+        >
           {b.label}
         </span>
       ))}
@@ -435,7 +650,13 @@ function ActionRow({ cfg }: { cfg: PlatformConfig }) {
   );
 }
 
-function AndroidPreview({ draft, view }: { draft: RegularLayoutDraft; view: View }) {
+export function AndroidPreview({
+  draft,
+  view,
+}: {
+  draft: RegularLayoutDraft;
+  view: View;
+}) {
   const cfg = draft.android;
   const expanded = view === "expanded";
   const src = mediaSrc(cfg);
@@ -446,11 +667,20 @@ function AndroidPreview({ draft, view }: { draft: RegularLayoutDraft; view: View
           src={imgAndroidPhone}
           alt=""
           className="pointer-events-none absolute max-w-none"
-          style={{ height: "110.76%", left: "-60.38%", top: "-5.68%", width: "220.75%" }}
+          style={{
+            height: "110.76%",
+            left: "-60.38%",
+            top: "-5.68%",
+            width: "220.75%",
+          }}
         />
       </div>
       <span className="absolute left-[16.76px] top-[32.83px] h-[592px] w-[315px] rounded-[10px] bg-[#F4F8FF]" />
-      <img src={imgPhoneShadow} alt="" className="absolute left-px top-[654px] h-[39px] w-[320px] max-w-none" />
+      <img
+        src={imgPhoneShadow}
+        alt=""
+        className="absolute left-px top-[654px] h-[39px] w-[320px] max-w-none"
+      />
       <div
         className="absolute left-[24px] top-[42px] w-[299px] overflow-hidden rounded-[5px] border border-solid border-[#DDE2EE] bg-white shadow-[0_5px_6px_rgba(0,0,0,0.07)]"
         style={{ background: backgroundFor(cfg) }}
@@ -460,9 +690,18 @@ function AndroidPreview({ draft, view }: { draft: RegularLayoutDraft; view: View
             <span className="grid size-4 place-items-center rounded-[2px] bg-[#DDE2EE]">
               <img src={imgBrandIcon} alt="" className="size-3 max-w-none" />
             </span>
-            <span className="font-manrope text-xs leading-none tracking-[0.25px] text-black">Brand name</span>
+            <span className="font-manrope text-xs leading-none tracking-[0.25px] text-black">
+              Brand name
+            </span>
           </div>
-          <img src={imgChevron} alt="" className={cn("size-[7px] max-w-none", expanded ? "-rotate-90" : "rotate-90")} />
+          <img
+            src={imgChevron}
+            alt=""
+            className={cn(
+              "size-[7px] max-w-none",
+              expanded ? "-rotate-90" : "rotate-90",
+            )}
+          />
         </div>
         <div className="flex min-h-[49px] items-center justify-between gap-[10px] px-[15px] py-[10px]">
           <NotificationText draft={draft} cfg={cfg} />
@@ -470,26 +709,42 @@ function AndroidPreview({ draft, view }: { draft: RegularLayoutDraft; view: View
             <img src={imgLogo} alt="" className="size-6 max-w-none" />
           </span>
         </div>
-        {expanded && src && <img src={src} alt="" className="mx-px mb-px block h-[137px] w-[297px] rounded-[3px] object-cover" />}
+        {expanded && src && (
+          <img
+            src={src}
+            alt=""
+            className="mx-px mb-px block h-[137px] w-[297px] rounded-[3px] object-cover"
+          />
+        )}
         {expanded && <ActionRow cfg={cfg} />}
       </div>
     </div>
   );
 }
 
-function IosPreview({ draft, view }: { draft: RegularLayoutDraft; view: View }) {
+export function IosPreview({
+  draft,
+  view,
+}: {
+  draft: RegularLayoutDraft;
+  view: View;
+}) {
   const cfg = draft.ios;
   const expanded = view === "expanded";
   const src = mediaSrc(cfg);
   return (
     <div className="relative h-[582px] w-[305px] shrink-0">
       <div className="absolute inset-0 overflow-hidden rounded-[32px] border-4 border-solid border-black bg-[#F4F8FF]">
-        <img src={imgIosNotch} alt="" className="absolute left-1/2 top-[-4px] h-[17px] w-[106px] max-w-none -translate-x-1/2" />
+        <img
+          src={imgIosNotch}
+          alt=""
+          className="absolute left-1/2 top-[-4px] h-[17px] w-[106px] max-w-none -translate-x-1/2"
+        />
       </div>
       <div
         className={cn(
           "absolute left-[11.5px] w-[282px] overflow-hidden bg-white",
-          expanded ? "top-[27px] rounded-[14px]" : "top-[25px] rounded-[18px]"
+          expanded ? "top-[27px] rounded-[14px]" : "top-[25px] rounded-[18px]",
         )}
         style={{ background: backgroundFor(cfg) }}
       >
@@ -498,15 +753,35 @@ function IosPreview({ draft, view }: { draft: RegularLayoutDraft; view: View }) 
             <img src={imgLogo} alt="" className="size-6 max-w-none" />
           </span>
           <NotificationText draft={draft} cfg={cfg} compact={!expanded} />
+          {/* Collapsed iOS keeps the banner as a thumbnail on the right. */}
+          {!expanded && src && (
+            <img
+              src={src}
+              alt=""
+              className="size-[33px] shrink-0 rounded-[6px] object-cover"
+            />
+          )}
         </div>
-        {expanded && src && <img src={src} alt="" className="block h-[167px] w-[282px] rounded-b-[14px] object-cover" />}
+        {expanded && src && (
+          <img
+            src={src}
+            alt=""
+            className="block h-[167px] w-[282px] rounded-b-[14px] object-cover"
+          />
+        )}
         {expanded && <ActionRow cfg={cfg} />}
       </div>
     </div>
   );
 }
 
-function SegmentedIcons({ value, onChange }: { value: Platform; onChange: (p: Platform) => void }) {
+function SegmentedIcons({
+  value,
+  onChange,
+}: {
+  value: Platform;
+  onChange: (p: Platform) => void;
+}) {
   return (
     <div className="inline-flex">
       {(
@@ -524,7 +799,9 @@ function SegmentedIcons({ value, onChange }: { value: Platform; onChange: (p: Pl
           className={cn(
             "flex h-8 w-10 cursor-pointer items-center justify-center border transition-colors",
             i === 0 ? "rounded-l-md" : "-ml-px rounded-r-md",
-            value === id ? "relative z-[1] border-[#2F68E5] bg-[#2F68E5] text-white" : "border-[#DDE2EE] bg-white text-[#6F6F8D] hover:bg-[#F7F9FC]"
+            value === id
+              ? "relative z-[1] border-[#2F68E5] bg-[#2F68E5] text-white"
+              : "border-[#DDE2EE] bg-white text-[#6F6F8D] hover:bg-[#F7F9FC]",
           )}
         >
           <Icon className="size-4" />
@@ -534,7 +811,13 @@ function SegmentedIcons({ value, onChange }: { value: Platform; onChange: (p: Pl
   );
 }
 
-function SegmentedText({ value, onChange }: { value: View; onChange: (v: View) => void }) {
+function SegmentedText({
+  value,
+  onChange,
+}: {
+  value: View;
+  onChange: (v: View) => void;
+}) {
   return (
     <div className="inline-flex">
       {(
@@ -551,7 +834,9 @@ function SegmentedText({ value, onChange }: { value: View; onChange: (v: View) =
           className={cn(
             "flex h-8 cursor-pointer items-center border px-4 font-manrope text-sm font-semibold transition-colors",
             i === 0 ? "rounded-l-md" : "-ml-px rounded-r-md",
-            value === id ? "relative z-[1] border-[#2F68E5] bg-[#2F68E5] text-white" : "border-[#DDE2EE] bg-white text-[#6F6F8D] hover:bg-[#F7F9FC]"
+            value === id
+              ? "relative z-[1] border-[#2F68E5] bg-[#2F68E5] text-white"
+              : "border-[#DDE2EE] bg-white text-[#6F6F8D] hover:bg-[#F7F9FC]",
           )}
         >
           {label}
@@ -578,8 +863,11 @@ export default function PushRegularLayoutEditor({
   const [primaryKey, setPrimaryKey] = useState("");
   const [userPreview, setUserPreview] = useState<string | null>(null);
 
-  const setPlatform = (platform: Platform) => (patch: Partial<PlatformConfig>) =>
-    onChange({ [platform]: { ...draft[platform], ...patch } } as Partial<RegularLayoutDraft>);
+  const setPlatform =
+    (platform: Platform) => (patch: Partial<PlatformConfig>) =>
+      onChange({
+        [platform]: { ...draft[platform], ...patch },
+      } as Partial<RegularLayoutDraft>);
   const other: Platform = tab === "android" ? "ios" : "android";
 
   return (
@@ -596,7 +884,9 @@ export default function PushRegularLayoutEditor({
         </button>
 
         <div className="flex flex-col gap-[30px] px-10 pb-10 pt-8">
-          <h2 className="font-manrope text-base font-bold text-[#17173A]">Customise your notification</h2>
+          <h2 className="font-manrope text-base font-bold text-[#17173A]">
+            Customise your notification
+          </h2>
 
           <div className="flex max-w-[620px] flex-col gap-[26px]">
             <div>
@@ -644,48 +934,77 @@ export default function PushRegularLayoutEditor({
           <section className="max-w-[620px] overflow-hidden rounded-[5px] border border-[#DDE2EE] bg-white">
             <div className="flex items-start justify-between gap-6 px-6 py-6">
               <div>
-                <h3 className="font-manrope text-[15px] font-bold text-[#17173A]">Enable APN interactions</h3>
+                <h3 className="font-manrope text-[15px] font-bold text-[#17173A]">
+                  Enable APN interactions
+                </h3>
                 <p className="mt-1 font-manrope text-[13px] leading-[1.4] text-[#6F6F8D]">
                   Include rich media, action buttons, etc.
                 </p>
               </div>
-              <Toggle checked={draft.apnInteractions} onChange={(apnInteractions) => onChange({ apnInteractions })} label="Enable APN interactions" />
+              <Toggle
+                checked={draft.apnInteractions}
+                onChange={(apnInteractions) => onChange({ apnInteractions })}
+                label="Enable APN interactions"
+              />
             </div>
 
             {draft.apnInteractions && (
               <>
-                <div className="relative flex items-center justify-center gap-10 px-6">
-                  {(
-                    [
-                      ["android", "Android", AndroidIcon],
-                      ["ios", "iOS", AppleIcon],
-                    ] as const
-                  ).map(([id, label, Icon]) => (
-                    <button
-                      key={id}
-                      type="button"
-                      role="tab"
-                      aria-selected={tab === id}
-                      onClick={() => setTab(id)}
-                      className={cn(
-                        "relative flex cursor-pointer items-center gap-2 px-4 pb-3 pt-1 font-manrope text-sm transition-colors",
-                        tab === id ? "font-bold text-[#2F68E5]" : "font-medium text-[#6F6F8D] hover:text-[#17173A]"
-                      )}
-                    >
-                      <Icon className={cn("size-4", id === "android" && tab !== id && "text-[#6F6F8D]")} />
-                      {label}
-                      {tab === id && <span className="absolute inset-x-0 bottom-0 h-[3px] rounded-full bg-[#2F68E5]" />}
-                    </button>
-                  ))}
+                <div className="flex items-center justify-between gap-4 px-6">
+                  <div className="flex items-center gap-8">
+                    {(
+                      [
+                        ["android", "Android", AndroidIcon],
+                        ["ios", "iOS", AppleIcon],
+                      ] as const
+                    ).map(([id, label, Icon]) => (
+                      <button
+                        key={id}
+                        type="button"
+                        role="tab"
+                        aria-selected={tab === id}
+                        onClick={() => setTab(id)}
+                        className={cn(
+                          "relative flex cursor-pointer items-center gap-2 px-1 pb-3 pt-1 font-manrope text-sm transition-colors",
+                          tab === id
+                            ? "font-bold text-[#2F68E5]"
+                            : "font-medium text-[#6F6F8D] hover:text-[#17173A]",
+                        )}
+                      >
+                        <Icon
+                          className={cn(
+                            "size-4",
+                            id === "android" && tab !== id && "text-[#6F6F8D]",
+                          )}
+                        />
+                        {label}
+                        {tab === id && (
+                          <span className="absolute inset-x-0 bottom-0 h-[3px] rounded-full bg-[#2F68E5]" />
+                        )}
+                      </button>
+                    ))}
+                  </div>
                   <DsButton
                     variant="link"
-                    className="absolute right-6 top-0 h-auto pb-3 text-sm"
-                    onClick={() => onChange({ [tab]: { ...draft[other], mediaFile: draft[other].mediaFile } } as Partial<RegularLayoutDraft>)}
+                    className="h-auto gap-1.5 whitespace-nowrap pb-3 text-sm"
+                    onClick={() =>
+                      onChange({
+                        [tab]: {
+                          ...draft[other],
+                          mediaFile: draft[other].mediaFile,
+                        },
+                      } as Partial<RegularLayoutDraft>)
+                    }
                   >
+                    <Copy className="size-4" strokeWidth={1.75} />
                     Copy from {other === "android" ? "Android" : "iOS"}
                   </DsButton>
                 </div>
-                <PlatformFields platform={tab} cfg={draft[tab]} set={setPlatform(tab)} />
+                <PlatformFields
+                  platform={tab}
+                  cfg={draft[tab]}
+                  set={setPlatform(tab)}
+                />
               </>
             )}
           </section>
@@ -694,12 +1013,19 @@ export default function PushRegularLayoutEditor({
           <section className="max-w-[620px] overflow-hidden rounded-[5px] border border-[#DDE2EE] bg-white">
             <div className="flex items-start justify-between gap-6 px-6 py-6">
               <div>
-                <h3 className="font-manrope text-[15px] font-bold text-[#17173A]">Add-on options</h3>
+                <h3 className="font-manrope text-[15px] font-bold text-[#17173A]">
+                  Add-on options
+                </h3>
                 <p className="mt-1 font-manrope text-[13px] leading-[1.4] text-[#6F6F8D]">
-                  Enable custom key value or overwrite the comment of the notification
+                  Enable custom key value or overwrite the comment of the
+                  notification
                 </p>
               </div>
-              <Toggle checked={draft.addOns} onChange={(addOns) => onChange({ addOns })} label="Add-on options" />
+              <Toggle
+                checked={draft.addOns}
+                onChange={(addOns) => onChange({ addOns })}
+                label="Add-on options"
+              />
             </div>
             {draft.addOns && (
               <div className="flex flex-col gap-4 border-t border-[#DDE2EE] px-6 py-6">
@@ -710,7 +1036,13 @@ export default function PushRegularLayoutEditor({
                       <input
                         className={fieldClass}
                         value={p.key}
-                        onChange={(e) => onChange({ addOnPairs: draft.addOnPairs.map((x, j) => (j === i ? { ...x, key: e.target.value } : x)) })}
+                        onChange={(e) =>
+                          onChange({
+                            addOnPairs: draft.addOnPairs.map((x, j) =>
+                              j === i ? { ...x, key: e.target.value } : x,
+                            ),
+                          })
+                        }
                         placeholder="Key"
                       />
                     </div>
@@ -719,7 +1051,13 @@ export default function PushRegularLayoutEditor({
                       <input
                         className={fieldClass}
                         value={p.value}
-                        onChange={(e) => onChange({ addOnPairs: draft.addOnPairs.map((x, j) => (j === i ? { ...x, value: e.target.value } : x)) })}
+                        onChange={(e) =>
+                          onChange({
+                            addOnPairs: draft.addOnPairs.map((x, j) =>
+                              j === i ? { ...x, value: e.target.value } : x,
+                            ),
+                          })
+                        }
                         placeholder="Value"
                       />
                     </div>
@@ -727,7 +1065,13 @@ export default function PushRegularLayoutEditor({
                       <button
                         type="button"
                         aria-label={`Remove pair ${i + 1}`}
-                        onClick={() => onChange({ addOnPairs: draft.addOnPairs.filter((_, j) => j !== i) })}
+                        onClick={() =>
+                          onChange({
+                            addOnPairs: draft.addOnPairs.filter(
+                              (_, j) => j !== i,
+                            ),
+                          })
+                        }
                         className="grid size-10 shrink-0 cursor-pointer place-items-center rounded-md text-[#6F6F8D] hover:bg-[#F4F5F9]"
                       >
                         <Trash2 className="size-4" />
@@ -736,7 +1080,18 @@ export default function PushRegularLayoutEditor({
                   </div>
                 ))}
                 {draft.addOnPairs.length < MAX_PAIRS && (
-                  <DsButton variant="link" className="self-start" onClick={() => onChange({ addOnPairs: [...draft.addOnPairs, { key: "", value: "" }] })}>
+                  <DsButton
+                    variant="link"
+                    className="self-start"
+                    onClick={() =>
+                      onChange({
+                        addOnPairs: [
+                          ...draft.addOnPairs,
+                          { key: "", value: "" },
+                        ],
+                      })
+                    }
+                  >
                     <Plus /> Add key value pair
                   </DsButton>
                 )}
@@ -754,7 +1109,12 @@ export default function PushRegularLayoutEditor({
               <SegmentedIcons value={previewOs} onChange={setPreviewOs} />
               <SegmentedText value={view} onChange={setView} />
             </div>
-            <DsButton variant="secondary" className="h-8 px-3" disabled aria-label="Send a test notification">
+            <DsButton
+              variant="secondary"
+              className="h-8 px-3"
+              disabled
+              aria-label="Send a test notification"
+            >
               <Send /> Test
             </DsButton>
           </div>
@@ -774,22 +1134,35 @@ export default function PushRegularLayoutEditor({
                 onChange={(e) => setPrimaryKey(e.target.value)}
                 placeholder="Enter primary key"
               />
-              <DsButton type="submit" className="w-10 shrink-0 px-0" disabled={!primaryKey.trim()} aria-label="Preview for this user">
+              <DsButton
+                type="submit"
+                className="w-10 shrink-0 px-0"
+                disabled={!primaryKey.trim()}
+                aria-label="Preview for this user"
+              >
                 <ArrowRight />
               </DsButton>
             </form>
             {userPreview && (
               <p className="mt-2 font-manrope text-xs text-[#6F6F8D]">
-                Personalised values for <span className="font-semibold text-[#17173A]">{userPreview}</span> will show here once the
-                attribute lookup is connected.
+                Personalised values for{" "}
+                <span className="font-semibold text-[#17173A]">
+                  {userPreview}
+                </span>{" "}
+                will show here once the attribute lookup is connected.
               </p>
             )}
           </div>
 
-          {previewOs === "android" ? <AndroidPreview draft={draft} view={view} /> : <IosPreview draft={draft} view={view} />}
+          {previewOs === "android" ? (
+            <AndroidPreview draft={draft} view={view} />
+          ) : (
+            <IosPreview draft={draft} view={view} />
+          )}
 
           <p className="text-center font-manrope text-xs leading-4 tracking-[0.42px] text-[#6F6F8D]">
-            Note: This preview is for reference purposes only. The actual display may vary across devices with different resolutions.
+            Note: This preview is for reference purposes only. The actual
+            display may vary across devices with different resolutions.
           </p>
         </div>
       </aside>

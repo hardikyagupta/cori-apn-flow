@@ -99,12 +99,13 @@ import CampaignPreview from "./CampaignPreview";
 import PushCampaignNavbar from "./PushCampaignStepper";
 import PushSetupStep from "./PushSetupStep";
 import PushContentStep from "./PushContentStep";
+import { EMPTY_REGULAR_DRAFT, type RegularLayoutDraft } from "./PushRegularLayoutEditor";
 import GoalApprovalCard, { type ApprovalQuestion } from "./GoalApprovalCard";
 import { describeApprovalAnswers } from "@/data/approvalTranscript";
 import type { AudienceAgentHost, AudienceDraft } from "@/data/audienceAgentFlow";
 import StepCard from "./StepCard";
 import { CONSUMER_APPS } from "./pushAIScenarios.data";
-import type { PushCampaignPrefill } from "@/data/pushCartFlow";
+import { PUSH_CONTENT_CTA, type PushCampaignPrefill } from "@/data/pushCartFlow";
 import ChatInterface, {
   type SeededTopic,
   type StarterChip,
@@ -533,6 +534,10 @@ export default function CampaignCreationOverlay({
   // bumped per open so the widget remounts on a fresh thread.
   const [chatOpen, setChatOpen] = useState(false);
   const [chatSession, setChatSession] = useState(0);
+  // A notification Cori drafted on the Content step; `n` makes each one a new event.
+  // The Regular layout notification written on the Content step (by hand or by Cori).
+  const [pushDraft, setPushDraft] = useState<RegularLayoutDraft>(EMPTY_REGULAR_DRAFT);
+  const [contentSeed, setContentSeed] = useState<{ title: string; message: string; media?: string; n: number } | null>(null);
   const [chatTopic, setChatTopic] = useState<SeededTopic | null>(null);
   const [followUpTopic, setFollowUpTopic] = useState<SeededTopic | null>(null);
   const [followUpSeq, setFollowUpSeq] = useState(0);
@@ -556,6 +561,9 @@ export default function CampaignCreationOverlay({
   const audienceSeeded = useRef(false);
   // Whether the open chat is the audience thread — it closes when the step does.
   const audienceChat = useRef(false);
+  // The segment Cori has drafted but the marketer hasn't applied yet — it stays
+  // in the chat until they choose Apply audience.
+  const pendingAudience = useRef<AudienceDraft | null>(null);
   // Scroll container + per-card nodes, so opening a card can bring its header
   // up to the top of the canvas.
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -605,6 +613,7 @@ export default function CampaignCreationOverlay({
       setAssets(EMPTY_ASSETS);
       setAudience(EMPTY_AUDIENCE);
       setContent(EMPTY_CONTENT);
+      setPushDraft(EMPTY_REGULAR_DRAFT);
       setPreviewOpen(false);
       setStepIndex(0);
       setReachedIndex(0);
@@ -756,6 +765,23 @@ export default function CampaignCreationOverlay({
     setFollowUpSeq(0);
   }, [open, focusStepId, openStepIds]);
 
+  // App Push: the docked Cori follows the stepper. Moving to another step starts
+  // that step's own conversation (Content gets the template prompts) instead of
+  // carrying the previous step's thread along.
+  const pushStepId = channel === "App Push Notification" ? PUSH_STEPS[stepIndex]?.id : undefined;
+  const lastPushStepId = useRef(pushStepId);
+  useEffect(() => {
+    if (lastPushStepId.current === pushStepId) return;
+    lastPushStepId.current = pushStepId;
+    if (!chatOpen) return;
+    setChatMessage(undefined);
+    setChatTopic(null);
+    setChatVariant("campaigns");
+    setFollowUpTopic(null);
+    setFollowUpSeq(0);
+    setChatSession((n) => n + 1);
+  }, [pushStepId, chatOpen]);
+
   if (!mounted) return null;
 
   const toSeeded = (point: CampaignSuggestion): SeededTopic => ({
@@ -850,6 +876,23 @@ export default function CampaignCreationOverlay({
       // setSegmentPrompt(starter.prompt);
     },
   }));
+
+  // App Push Content step: "Cart reminder" asks Cori to write v1 of the notification.
+  const pushContentChips: StarterChip[] = PUSH_STEP_CHIPS.content.map((chip) =>
+    chip.label === "Cart reminder"
+      ? {
+          ...chip,
+          onSelect: () => {
+            setChatMessage(chip.prompts?.[0]);
+            setChatTopic(null);
+            setFollowUpTopic(null);
+            setFollowUpSeq(0);
+            setChatSession((n) => n + 1);
+            setChatOpen(true);
+          },
+        }
+      : chip,
+  );
 
   // Renaming from the navbar (or the Settings drawer) should carry through to
   // the tracking drawer's own campaign value — but only while that value is
@@ -1222,9 +1265,19 @@ export default function CampaignCreationOverlay({
     window.setTimeout(() => setAudienceFlash(false), AUDIENCE_FLASH_MS);
   };
 
-  /** The summary card and the Apply / Continue refining question both live in the
-   *  chat now, so the wizard has nothing further to track for them. */
-  const audienceAgentHost: AudienceAgentHost = { onDraft: plotAudienceDraft, onDecision: () => {} };
+  /** The summary card and the Apply / Continue refining question live in the chat;
+   *  the wizard only plots the segment once the marketer applies it. */
+  const audienceAgentHost: AudienceAgentHost = {
+    // A draft only lives in the chat card; the form is untouched until Apply.
+    onDraft: (d) => {
+      pendingAudience.current = d;
+    },
+    onDecision: (decision) => {
+      if (decision !== "apply" || !pendingAudience.current) return;
+      plotAudienceDraft(pendingAudience.current);
+      pendingAudience.current = null;
+    },
+  };
 
   /**
    * "Build with Audience agent": open the docked chat and put the agent's
@@ -1400,7 +1453,7 @@ export default function CampaignCreationOverlay({
             // undefined) so the chat doesn't fall back to the generic set.
             : chatStepId === "schedule"
               ? []
-              : (isPushChannel ? PUSH_STEP_CHIPS : STEP_CHIPS)[chatStepId]
+              : (isPushChannel ? (chatStepId === "content" ? { ...PUSH_STEP_CHIPS, content: pushContentChips } : PUSH_STEP_CHIPS) : STEP_CHIPS)[chatStepId]
         }
         emptyStateGreeting={STEP_GREETINGS[chatStepId]}
         emptyStatePlaceholder={STEP_PLACEHOLDERS[chatStepId]}
@@ -1425,6 +1478,11 @@ export default function CampaignCreationOverlay({
         followUpTopic={followUpTopic}
         followUpSeq={followUpSeq}
         audienceAgent={audienceAgentHost}
+        contentAgent={
+          isPushChannel && chatStepId === "content"
+            ? { onDraft: (d) => setContentSeed({ title: d.title, message: d.message, media: d.media, n: Date.now() }) }
+            : undefined
+        }
         approvalCard={
           goalApprovalOpen ? (
             <GoalApprovalCard
@@ -1454,6 +1512,14 @@ export default function CampaignCreationOverlay({
           const cohort = card.cohorts?.find((c) => c.id === selectedId);
           if (cohort) {
             applyCohort(cohort);
+            return;
+          }
+          // App Push: Cori's hand-off from Audience to the Content step.
+          if (card.kind === "cta" && card.title === PUSH_CONTENT_CTA) {
+            const to = PUSH_STEPS.findIndex((st) => st.id === "content");
+            setStepIndex(to);
+            setReachedIndex((r) => Math.max(r, to));
+            canvasRef.current?.scrollTo({ top: 0 });
             return;
           }
           // The "Welcome new customers" walkthrough's own chain — each card
@@ -1646,6 +1712,7 @@ export default function CampaignCreationOverlay({
           chatSlot={chatColumn}
           channel={channel}
           pushDetails={prefill?.details}
+          customDraft={pushDraft}
         />
       ) : isPushChannel ? (
         <>
@@ -1735,6 +1802,9 @@ export default function CampaignCreationOverlay({
                 // The layout picker + template drawer. The earlier template grid
                 // with A/B test (CampaignContentStep) is parked for push.
                 <PushContentStep
+                  seed={contentSeed}
+                  draft={pushDraft}
+                  onDraftChange={(update) => setPushDraft(update)}
                   values={content}
                   onChange={(patch) => setContent((c) => ({ ...c, ...patch }))}
                 />
