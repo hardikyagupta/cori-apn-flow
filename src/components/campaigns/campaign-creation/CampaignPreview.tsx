@@ -19,9 +19,10 @@ import { describeSlot, sliceSummaryLabel, type ScheduleValues } from "./Campaign
 import { TemplateThumbnail } from "./TemplateCard";
 import { emailTemplates } from "./emailTemplates.data";
 import { buildFindings, groupFindings, type Finding } from "./previewFindings.data";
+import { buildPushFindings } from "./pushFindings.data";
 import { FindingCard } from "./FindingCard";
 import PushPreviewBody from "./PushPreviewBody";
-import type { RegularLayoutDraft } from "./PushRegularLayoutEditor";
+import { EMPTY_REGULAR_DRAFT, type RegularLayoutDraft } from "./PushRegularLayoutEditor";
 import { appPushTemplates } from "./appPushTemplates.data";
 import { APP_OPTIONS } from "./appOptions.data";
 import { PlatformIcon } from "./PlatformIcons";
@@ -102,6 +103,7 @@ export default function CampaignPreview({
   channel = "Email",
   pushDetails,
   customDraft,
+  aiMade,
 }: {
   campaignId: string;
   campaignName: string;
@@ -128,6 +130,8 @@ export default function CampaignPreview({
   pushDetails?: PushCampaignPrefill["details"];
   /** App Push: the Regular layout notification written on the Content step. */
   customDraft?: RegularLayoutDraft;
+  /** App Push: parts Cori built, which the review leaves alone. */
+  aiMade?: { timing?: boolean; audience?: boolean; content?: boolean };
 }) {
   const [previewEmail, setPreviewEmail] = useState("");
   const [refreshing, setRefreshing] = useState(false);
@@ -141,7 +145,11 @@ export default function CampaignPreview({
   const pushTemplate = appPushTemplates.find((t) => t.id === content.templateId);
   const apps = APP_OPTIONS.filter((a) => audience.selectedApps.includes(a.id));
   const reach = reachFor(audience);
-  const groups = groupFindings(buildFindings({ setup, audience, content, schedule }));
+  const groups = groupFindings(
+    isPush
+      ? buildPushFindings({ audience, content, schedule, draft: customDraft ?? EMPTY_REGULAR_DRAFT, aiMade })
+      : buildFindings({ setup, audience, content, schedule })
+  );
   const findingCount = groups.reduce((n, g) => n + g.items.length, 0);
 
   const audienceSummary = () => {
@@ -164,6 +172,43 @@ export default function CampaignPreview({
     if (schedule.mode === "slice") return sliceSummaryLabel(schedule, reach);
     return `Optimised per contact · ${schedule.optimizeWindow}`;
   };
+
+  // The co-marketer's review of this campaign. Hidden while the chat is
+  // docked; the thread is the same co-marketer.
+  const reviewAside = !chatOpen && (
+          
+          <aside className="flex w-[380px] shrink-0 flex-col gap-5">
+            <div className="rounded-lg border border-[#DDE2EE] bg-white p-4">
+              <div className="flex items-center gap-2">
+                <img src={sparkle} alt="" className="size-5 shrink-0" />
+                <h2 className="font-manrope text-base font-bold text-[#17173A]">
+                  Cori review
+                </h2>
+              </div>
+              <p className="mt-1 font-manrope text-xs leading-[18px] text-[#6F6F8D]">
+                {findingCount === 0
+                  ? "I've been through this one and found nothing that would hold it back."
+                  : `I went through this campaign against your last 90 days. ${findingCount} thing${
+                      findingCount === 1 ? "" : "s"
+                    } worth fixing before it goes out.`}
+              </p>
+            </div>
+
+            {groups.map((group) => (
+              <div key={group.category}>
+                <p className="mb-3 font-manrope text-xs font-bold uppercase tracking-[0.6px] text-[#8A8AA3]">
+                  {group.category} · {group.items.length} finding
+                  {group.items.length === 1 ? "" : "s"}
+                </p>
+                <div className="space-y-3">
+                  {group.items.map((f) => (
+                    <FindingCard key={f.id} finding={f} onAsk={() => onAskFinding(f)} />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </aside>
+  );
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -202,6 +247,8 @@ export default function CampaignPreview({
       <div className={cn("flex min-h-0 flex-1 gap-5", chatOpen ? "pr-5" : "")}>
         <div className="scroll-slim min-h-0 flex-1 overflow-y-auto px-14 py-6">
           {isPush ? (
+            <div className="flex items-start gap-5">
+            <div className="min-w-0 flex-1">
             <PushPreviewBody
               campaignId={campaignId}
               campaignName={name}
@@ -213,6 +260,9 @@ export default function CampaignPreview({
               customDraft={customDraft}
               onEditStep={onEditStep}
             />
+            </div>
+            {reviewAside}
+            </div>
           ) : (
           <div className="flex items-start gap-5">
           {/* Left column — setup and audience */}
@@ -485,41 +535,7 @@ export default function CampaignPreview({
             </PreviewCard>
           </div>
 
-          {/* Right rail — the co-marketer's review of this campaign. Hidden
-              while the chat is docked; the thread is the same co-marketer. */}
-          {!chatOpen && !isPush && (
-          <aside className="flex w-[380px] shrink-0 flex-col gap-5">
-            <div className="rounded-lg border border-[#DDE2EE] bg-white p-4">
-              <div className="flex items-center gap-2">
-                <img src={sparkle} alt="" className="size-5 shrink-0" />
-                <h2 className="font-manrope text-base font-bold text-[#17173A]">
-                  Cori review
-                </h2>
-              </div>
-              <p className="mt-1 font-manrope text-xs leading-[18px] text-[#6F6F8D]">
-                {findingCount === 0
-                  ? "I've been through this one and found nothing that would hold it back."
-                  : `I went through this campaign against your last 90 days. ${findingCount} thing${
-                      findingCount === 1 ? "" : "s"
-                    } worth fixing before it goes out.`}
-              </p>
-            </div>
-
-            {groups.map((group) => (
-              <div key={group.category}>
-                <p className="mb-3 font-manrope text-xs font-bold uppercase tracking-[0.6px] text-[#8A8AA3]">
-                  {group.category} · {group.items.length} finding
-                  {group.items.length === 1 ? "" : "s"}
-                </p>
-                <div className="space-y-3">
-                  {group.items.map((f) => (
-                    <FindingCard key={f.id} finding={f} onAsk={() => onAskFinding(f)} />
-                  ))}
-                </div>
-              </div>
-            ))}
-          </aside>
-          )}
+          {reviewAside}
           </div>
           )}
         </div>

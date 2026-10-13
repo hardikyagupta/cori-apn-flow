@@ -18,6 +18,7 @@ import type { SetupValues } from "./CampaignSetupStep";
 import type { ContentValues } from "./CampaignContentStep";
 import type { ScheduleValues } from "./CampaignScheduleStep";
 import type { AudienceCohort } from "./audienceCohorts.data";
+import type { RegularLayoutDraft } from "./PushRegularLayoutEditor";
 
 export type SetupApplyKind =
   | "tags"
@@ -34,6 +35,7 @@ export type SetupApplyKind =
   // Kinds for the scripted "Welcome new customers" autonomous walkthrough —
   // see welcomeNewCustomersFlow.data.ts.
   | "cta"
+  | "pushContent"
   | "templates"
   | "subjectOptions"
   | "scheduleChoice"
@@ -82,6 +84,8 @@ export interface SetupApplyCardData {
   contentPatch?: Partial<ContentValues>;
   /** Written onto the schedule form, for schedule-step suggestions. */
   schedulePatch?: Partial<ScheduleValues>;
+  /** Written onto the App Push notification being drafted. */
+  pushDraftPatch?: Partial<RegularLayoutDraft>;
   /** Audience cuts — rendered as a stack, each plotted on its own. */
   cohorts?: AudienceCohort[];
   /** Goal the cuts were picked for, named in each card's "why" line. */
@@ -274,6 +278,7 @@ const ICON: Record<SetupApplyKind, { icon: LucideIcon; wrap: string; color: stri
   optimize: { icon: Sparkles, wrap: "bg-[#F0E8FF]", color: "text-[#7B5CFA]" },
   cap: { icon: ShieldCheck, wrap: "bg-[#E6F8F0]", color: "text-[#00A86B]" },
   cta: { icon: Sparkles, wrap: "bg-[#F0E8FF]", color: "text-[#7B5CFA]" },
+  pushContent: { icon: LayoutTemplate, wrap: "bg-[#F0E8FF]", color: "text-[#7B5CFA]" },
   // These four are special-cased below (stacked cards, multiple actions each)
   // and never reach the generic icon header — entries exist only to satisfy
   // the Record's exhaustiveness check.
@@ -290,6 +295,7 @@ const COPY_LABEL: Partial<Record<SetupApplyKind, string>> = {
   sendtime: "Recommended send time",
   optimize: "Delivery",
   cap: "Frequency cap",
+  pushContent: "Recommended change",
 };
 
 export default function SetupApplyCard({
@@ -508,5 +514,12 @@ export default function SetupApplyCard({
         </button>
       </div>
     </div>
+  );
+}
+
+/** Has this suggested change already been made to the notification? */
+export function isPushDraftPatchApplied(patch: Partial<RegularLayoutDraft>, draft: RegularLayoutDraft): boolean {
+  return (Object.keys(patch) as (keyof RegularLayoutDraft)[]).every(
+    (k) => JSON.stringify(draft[k]) === JSON.stringify(patch[k])
   );
 }

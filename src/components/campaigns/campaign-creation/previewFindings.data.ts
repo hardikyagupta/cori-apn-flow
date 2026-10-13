@@ -5,6 +5,7 @@ import { reachFor, type AudienceValues } from "./CampaignAudienceStep";
 import type { ContentValues } from "./CampaignContentStep";
 import type { SetupValues } from "./CampaignSetupStep";
 import { emailTemplates } from "./emailTemplates.data";
+import type { RegularLayoutDraft } from "./PushRegularLayoutEditor";
 
 /**
  * What the co-marketer says about a campaign at preview time. These are read
@@ -33,6 +34,8 @@ export interface Finding {
     schedulePatch?: Partial<ScheduleValues>;
     contentPatch?: Partial<ContentValues>;
     setupPatch?: Partial<SetupValues>;
+    /** App Push: a change to the notification being drafted. */
+    pushDraftPatch?: Partial<RegularLayoutDraft>;
   };
   /** The card's one CTA, written as what the user is asking for. Doubles as
    *  the opening message of the thread it starts. */
