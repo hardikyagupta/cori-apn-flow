@@ -1,4 +1,5 @@
 import type { AdhocCondition } from "@/components/campaigns/campaign-creation/CampaignAudienceStep";
+import type { AudienceDraftView } from "@/data/audienceAgentFlow";
 import { toLocalInput } from "@/components/campaigns/campaign-creation/CampaignScheduleStep";
 import { COUPON_EXPIRY_TEMPLATE_ID } from "@/components/campaigns/campaign-creation/appPushTemplates.data";
 
@@ -14,17 +15,49 @@ export const PUSH_CART_TEMPLATE_NAME = "Coupon Expiry Reminder";
 
 /** Anything that asks for an app push / APN campaign around carts. */
 export function isPushCartPrompt(message: string): boolean {
-  return /app\s*push|\bapn\b|push\s*notification/i.test(message) && /cart/i.test(message);
+  return /app\s*push|\bapn\b|push\s*notification|mobile\s*push/i.test(message) && /cart|checkout|check\s*out/i.test(message);
 }
 
 /** The channel-agnostic opener — the marketer names who to reach, not the
  *  channel, so Cori recommends one first (see CHANNEL_QUESTION). */
 export function isChannelAskPrompt(message: string): boolean {
-  return (
-    /cart/i.test(message) &&
-    /(haven'?t|have not|not|without)\s+(checked\s*out|check\s*out|purchased|bought|completed)/i.test(message) &&
-    !isPushCartPrompt(message)
-  );
+  const mentionsCart = /cart|basket|abandon/i.test(message);
+  const leftWithoutBuying =
+    /(haven'?t|have not|hasn'?t|didn'?t|did not|not|never|without|yet to)\s+(yet\s+)?(checked\s*out|check\s*out|purchased|bought|buy|completed|ordered|finished)/i.test(message) ||
+    /abandon(ed|ers?|ment)?\s+(their\s+)?(cart|basket|checkout)|(cart|basket|checkout)\s+abandon/i.test(message) ||
+    /left\s+(items|products)?.*\b(in|behind)\b.*(cart|basket)/i.test(message);
+  return mentionsCart && leftWithoutBuying && !isPushCartPrompt(message);
+}
+
+/** "cancel", "start over", "never mind" — the marketer wants out of the scripted flow. */
+export function isCancelPrompt(message: string): boolean {
+  return /^\s*(cancel|stop|start over|start again|never\s*mind|forget it|reset|exit)\b/i.test(message);
+}
+
+/** Which of a question's options the marketer's typed words amount to, if any —
+ *  exact label, a label named inside the sentence, or a plain yes / no. */
+export function matchOption(message: string, options: string[]): string | null {
+  const norm = (t: string) => t.toLowerCase().replace(/[^a-z0-9 ]+/g, " ").replace(/\s+/g, " ").trim();
+  const said = norm(message);
+  if (!said) return null;
+  const exact = options.find(o => norm(o) === said);
+  if (exact) return exact;
+  const named = options
+    .filter(o => said.includes(norm(o)))
+    .sort((x, y) => y.length - x.length)[0];
+  if (named) return named;
+  const partial = said.length >= 4 ? options.filter(o => norm(o).includes(said)) : [];
+  if (partial.length === 1) return partial[0];
+  if (/^(yes|yep|yeah|sure|ok|okay|go ahead|do it)\b/.test(said)) return options.find(o => /^yes/i.test(o)) ?? null;
+  if (/^(no|nope|nah)\b/.test(said)) return options.find(o => /^no\b/i.test(o)) ?? null;
+  return null;
+}
+
+/** Which channel a free-typed message names, if any. */
+export function namedChannel(message: string): "push" | "other" | null {
+  if (/app\s*push|push\s*notification|\bapn\b|mobile\s*push/i.test(message)) return "push";
+  if (/e-?mail|sms|whats\s*app|\brcs\b|web\s*push|in-?app|facebook|instagram|\bmms\b/i.test(message)) return "other";
+  return null;
 }
 
 export type FlowAnswers = Record<string, string | null>;
@@ -37,6 +70,9 @@ export interface FlowQuestion {
   otherPlaceholder?: string;
   /** Adds a calendar button to the Other row that picks a date and time. */
   otherDateTime?: boolean;
+  /** More than one option can be picked; the answer is the picks joined by
+   *  newlines (plus any typed text). */
+  multi?: boolean;
   /** Can't be passed over — the Skip button is dropped. */
   required?: boolean;
   /** Label for this question's primary button when it is the last one. */
@@ -286,12 +322,13 @@ export function prefillFrom(d: PushCartDraft): PushCampaignPrefill {
 
 /** Events the flow's cards send back up to the chat. */
 export type PushFlowEvent =
-  | { type: "questions"; stage: 0 | 1 | 2; answers: FlowAnswers; questions: FlowQuestion[] }
+  | { type: "questions"; stage: number | string; answers: FlowAnswers; questions: FlowQuestion[] }
   | { type: "content"; draft: PushCartDraft }
   | { type: "changes" }
   | { type: "preview"; draft: PushCartDraft };
 
 export type PushFlowCard =
-  | { kind: "questions"; stage: 0 | 1 | 2; questions: FlowQuestion[] }
+  | { kind: "questions"; stage: number | string; questions: FlowQuestion[] }
   | { kind: "content"; draft: PushCartDraft; needsPromo: boolean; version?: number; superseded?: boolean }
-  | { kind: "brief"; draft: PushCartDraft };
+  | { kind: "brief"; draft: PushCartDraft }
+  | { kind: "audience"; draft: AudienceDraftView };

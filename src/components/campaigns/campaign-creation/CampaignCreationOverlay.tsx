@@ -98,8 +98,10 @@ import {
 import CampaignPreview from "./CampaignPreview";
 import PushCampaignNavbar from "./PushCampaignStepper";
 import PushSetupStep from "./PushSetupStep";
+import PushContentStep from "./PushContentStep";
 import GoalApprovalCard, { type ApprovalQuestion } from "./GoalApprovalCard";
 import { describeApprovalAnswers } from "@/data/approvalTranscript";
+import type { AudienceAgentHost, AudienceDraft } from "@/data/audienceAgentFlow";
 import StepCard from "./StepCard";
 import { CONSUMER_APPS } from "./pushAIScenarios.data";
 import type { PushCampaignPrefill } from "@/data/pushCartFlow";
@@ -1205,6 +1207,25 @@ export default function CampaignCreationOverlay({
     }
   };
 
+  /** A draft (then a refined draft) from Cori's conversation, plotted onto the
+   *  Audience fields the same way a picked cut is. */
+  const plotAudienceDraft = (d: AudienceDraft) => {
+    setAudience((a) => ({
+      ...a,
+      mode: "adhoc",
+      conditions: d.conditions,
+      conditionsReach: d.reach,
+      excludeEnabled: d.excludes.length > 0,
+      excludeSegments: d.excludes.map((e) => ({ id: e.id, name: e.name, reach: e.reach, ai: true })),
+    }));
+    setAudienceFlash(true);
+    window.setTimeout(() => setAudienceFlash(false), AUDIENCE_FLASH_MS);
+  };
+
+  /** The summary card and the Apply / Continue refining question both live in the
+   *  chat now, so the wizard has nothing further to track for them. */
+  const audienceAgentHost: AudienceAgentHost = { onDraft: plotAudienceDraft, onDecision: () => {} };
+
   /**
    * "Build with Audience agent": open the docked chat and put the agent's
    * questions above its composer. It can't cut an audience without knowing
@@ -1361,6 +1382,9 @@ export default function CampaignCreationOverlay({
   /* Co-marketer chat — docked column. Opened from a suggestion card (seeded
      on that prompt), from a preview finding, or from "Ask co-marketer" in
      either header. Rendered beside whichever screen is up. */
+  // App Push drives its steps from the stepper, not the accordion rail, so the
+  // chat's starter chips and greeting follow the step on screen.
+  const chatStepId = isPushChannel ? PUSH_STEPS[stepIndex].id : railStepId;
   const chatColumn = chatOpen ? (
     <div className="flex h-full min-h-0 w-[474px] shrink-0 justify-end overflow-hidden py-3">
       <ChatInterface
@@ -1370,16 +1394,16 @@ export default function CampaignCreationOverlay({
         conversationVariant={chatVariant}
         initialMessage={chatMessage}
         starterChipSet={
-          railStepId === "audience"
+          chatStepId === "audience"
             ? audienceChips
             // Schedule has no starter chips of its own — an empty array (not
             // undefined) so the chat doesn't fall back to the generic set.
-            : railStepId === "schedule"
+            : chatStepId === "schedule"
               ? []
-              : (isPushChannel ? PUSH_STEP_CHIPS : STEP_CHIPS)[railStepId]
+              : (isPushChannel ? PUSH_STEP_CHIPS : STEP_CHIPS)[chatStepId]
         }
-        emptyStateGreeting={STEP_GREETINGS[railStepId]}
-        emptyStatePlaceholder={STEP_PLACEHOLDERS[railStepId]}
+        emptyStateGreeting={STEP_GREETINGS[chatStepId]}
+        emptyStatePlaceholder={STEP_PLACEHOLDERS[chatStepId]}
         initialTopic={chatTopic ?? undefined}
         // A segment the agent built — its rules land on the Conditions tab as
         // editable rows, rather than as a read-only segment the user can't
@@ -1400,6 +1424,7 @@ export default function CampaignCreationOverlay({
         }}
         followUpTopic={followUpTopic}
         followUpSeq={followUpSeq}
+        audienceAgent={audienceAgentHost}
         approvalCard={
           goalApprovalOpen ? (
             <GoalApprovalCard
@@ -1654,8 +1679,9 @@ export default function CampaignCreationOverlay({
             )}
           >
             {/* 3/4 of the canvas by default; with Cori docked the canvas is already
-                narrower, so the content takes all of it. */}
-            <div className={chatOpen ? "w-full" : "w-3/4"}>
+                narrower, so the content takes all of it. The layout picker also takes
+                it all — seven cards a row need the room (see PushContentStep). */}
+            <div className={chatOpen || PUSH_STEPS[stepIndex].id === "content" ? "w-full" : "w-3/4"}>
               {PUSH_STEPS[stepIndex].id === "setup" && (
                 // The old accordion rows for apps / tracking / conversion
                 // (CampaignAudienceStep part="setup") are parked for now.
@@ -1706,14 +1732,11 @@ export default function CampaignCreationOverlay({
                 />
               )}
               {PUSH_STEPS[stepIndex].id === "content" && (
-                <CampaignContentStep
+                // The layout picker + template drawer. The earlier template grid
+                // with A/B test (CampaignContentStep) is parked for push.
+                <PushContentStep
                   values={content}
-                  highlight={contentHighlight}
                   onChange={(patch) => setContent((c) => ({ ...c, ...patch }))}
-                  reach={reachFor(audience)}
-                  aiGenerated={campaignAIGenerated}
-                  channel={channel}
-                  hasTargetApps={audience.selectedApps.length > 0}
                 />
               )}
               {PUSH_STEPS[stepIndex].id === "schedule" && (

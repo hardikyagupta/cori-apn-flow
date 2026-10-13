@@ -430,6 +430,10 @@ export function reachFor(v: AudienceValues): number {
  * and proposes cohorts; picking one plots straight into these fields, which is
  * why everything here is editable afterwards rather than read-only.
  */
+/** Parked: the banner that hands the audience to the Segment agent in the
+ *  chat. Cori now builds one from a typed goal instead (audienceAgentFlow). */
+const SHOW_SEGMENT_AGENT_BANNER = false;
+
 /**
  * The standing offer to have the audience built for you. It is not a fifth
  * mode: it never selects one, it hands the brief to the Segment agent in the
@@ -691,7 +695,7 @@ export default function CampaignAudienceStep({
     ];
     return (
       <>
-      {onUseSegmentAgent && <SegmentAgentBanner onUse={onUseSegmentAgent} />}
+      {SHOW_SEGMENT_AGENT_BANNER && onUseSegmentAgent && <SegmentAgentBanner onUse={onUseSegmentAgent} />}
       <div className="rounded-lg border border-[#DDE2EE] bg-white p-8">
         <div className="flex items-start justify-between gap-6">
           <div>
@@ -819,7 +823,7 @@ export default function CampaignAudienceStep({
 
   return (
     <>
-    {onUseSegmentAgent && part !== "setup" && <SegmentAgentBanner onUse={onUseSegmentAgent} />}
+    {SHOW_SEGMENT_AGENT_BANNER && onUseSegmentAgent && part !== "setup" && <SegmentAgentBanner onUse={onUseSegmentAgent} />}
     <StepCard full>
       {part !== "audience" && channel !== "Email" && (
         <div className="mb-6">
