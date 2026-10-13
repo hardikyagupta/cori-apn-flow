@@ -1,8 +1,9 @@
-import { useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import PushTemplateDrawer from "./PushTemplateDrawer";
 import PushRegularLayoutEditor, {
   EMPTY_REGULAR_DRAFT,
+  hasDraftContent,
   type RegularLayoutDraft,
 } from "./PushRegularLayoutEditor";
 import { appPushTemplates } from "./appPushTemplates.data";
@@ -428,17 +429,47 @@ function LayoutCard({
 export default function PushContentStep({
   values,
   onChange,
+  seed,
+  draft,
+  onDraftChange,
 }: {
   values: ContentValues;
   onChange: (patch: Partial<ContentValues>) => void;
+  /** The Regular layout notification, kept by the wizard so the preview (and a
+   *  return to this step) still has it. */
+  draft: RegularLayoutDraft;
+  onDraftChange: (update: (d: RegularLayoutDraft) => RegularLayoutDraft) => void;
+  /** A notification Cori drafted — fills the editor and opens it. */
+  seed?: { title: string; message: string; media?: string; n: number } | null;
 }) {
   const [layout, setLayout] = useState<LayoutKind | "new" | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  // "Create new" opens the Regular layout editor; the draft lives here so it
-  // survives a trip back to the layout picker.
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState<RegularLayoutDraft>(EMPTY_REGULAR_DRAFT);
+  // "Create new" opens the Regular layout editor. Coming back to this step with
+  // a notification already written lands straight in it.
+  const [editing, setEditing] = useState(() => hasDraftContent(draft));
+  const setDraft = onDraftChange;
+  useEffect(() => {
+    if (!seed) return;
+    // A banner turns on Rich media (Image, by URL) for both platforms.
+    const media = seed.media ? { richMedia: true, mediaKind: "image" as const, mediaSource: "url" as const, mediaUrl: seed.media } : null;
+    setDraft((d) => ({
+      ...d,
+      title: seed.title,
+      message: seed.message,
+      ...(media ? { apnInteractions: true, android: { ...d.android, ...media }, ios: { ...d.ios, ...media } } : {}),
+    }));
+    setLayout("new");
+    setEditing(true);
+  }, [seed]);
   const template = appPushTemplates.find((t) => t.id === values.templateId);
+
+  // "Create new" always opens a blank notification — whatever was in the editor
+  // before (a template, an earlier draft) is not carried over.
+  const startFresh = () => {
+    setDraft(() => EMPTY_REGULAR_DRAFT);
+    setLayout("new");
+    setEditing(true);
+  };
 
   const drawer = (
     <PushTemplateDrawer
@@ -447,8 +478,7 @@ export default function PushContentStep({
       onClose={() => setDrawerOpen(false)}
       onCreateNew={() => {
         setDrawerOpen(false);
-        setLayout("new");
-        setEditing(true);
+        startFresh();
       }}
       onSelect={(id) => {
         onChange({ templateId: id });
@@ -534,8 +564,7 @@ export default function PushContentStep({
               label="Create new"
               selected={layout === "new"}
               onClick={() => {
-                setLayout("new");
-                setEditing(true);
+                startFresh();
               }}
             >
               <span className="grid h-full w-full place-items-center">

@@ -29,6 +29,43 @@ export function isChannelAskPrompt(message: string): boolean {
   return mentionsCart && leftWithoutBuying && !isPushCartPrompt(message);
 }
 
+/** The Content step's "Cart reminder" ask — Cori drafts the notification itself. */
+export function isCartReminderPrompt(message: string): boolean {
+  return /cart/i.test(message) && /(reminder|nudg|finish|complete|abandon)/i.test(message) && /(title|message|push|notification|reminder)/i.test(message);
+}
+
+/** Title of the card that sends the marketer from Audience on to Content. */
+export const PUSH_CONTENT_CTA = "Write the notification";
+
+/** v1 of the cart reminder Cori writes on the Content step. */
+export const CART_REMINDER_V1 = {
+  title: "Your cart is waiting! 🛒",
+  message: "Complete your purchase before your favourites are gone.",
+};
+
+/** v2 of the cart reminder, after the marketer asks for a specific discount
+ *  and more urgency. `{{disc_value}}` is the per-user personalisation tag. */
+export const CART_REMINDER_V2 = {
+  title: "Abhi nahi toh kab? ⏰",
+  message: "Complete your purchase tonight and enjoy {{disc_value}} off!",
+  media: "https://img.magnific.com/free-vector/halftone-style-comic-sale-background-yellow-white-color_1017-59305.jpg",
+};
+
+/** The one-tap feedback Cori offers under v1. */
+export const CART_V2_FEEDBACK =
+  "Make the offer more specific by showing the discount amount, and create more urgency by highlighting that the exclusive offer ends tonight.";
+
+/** Feedback on v1 that asks for the discount and/or urgency. */
+export function isCartFeedbackPrompt(message: string): boolean {
+  return /(discount|offer|amount|specific|urgen|tonight|ends|hurry|deadline|limited)/i.test(message);
+}
+
+/** What the wizard's Content step hands Cori so a drafted notification lands
+ *  in the editor. */
+export interface ContentAgentHost {
+  onDraft: (draft: { title: string; message: string; version: number; media?: string }) => void;
+}
+
 /** "cancel", "start over", "never mind" — the marketer wants out of the scripted flow. */
 export function isCancelPrompt(message: string): boolean {
   return /^\s*(cancel|stop|start over|start again|never\s*mind|forget it|reset|exit)\b/i.test(message);

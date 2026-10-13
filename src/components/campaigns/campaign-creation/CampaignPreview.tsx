@@ -21,6 +21,7 @@ import { emailTemplates } from "./emailTemplates.data";
 import { buildFindings, groupFindings, type Finding } from "./previewFindings.data";
 import { FindingCard } from "./FindingCard";
 import PushPreviewBody from "./PushPreviewBody";
+import type { RegularLayoutDraft } from "./PushRegularLayoutEditor";
 import { appPushTemplates } from "./appPushTemplates.data";
 import { APP_OPTIONS } from "./appOptions.data";
 import { PlatformIcon } from "./PlatformIcons";
@@ -100,6 +101,7 @@ export default function CampaignPreview({
   chatSlot,
   channel = "Email",
   pushDetails,
+  customDraft,
 }: {
   campaignId: string;
   campaignName: string;
@@ -124,6 +126,8 @@ export default function CampaignPreview({
   channel?: string;
   /** What Cori drafted for an App Push campaign — listed beside the template. */
   pushDetails?: PushCampaignPrefill["details"];
+  /** App Push: the Regular layout notification written on the Content step. */
+  customDraft?: RegularLayoutDraft;
 }) {
   const [previewEmail, setPreviewEmail] = useState("");
   const [refreshing, setRefreshing] = useState(false);
@@ -206,6 +210,7 @@ export default function CampaignPreview({
               content={content}
               schedule={schedule}
               pushDetails={pushDetails}
+              customDraft={customDraft}
               onEditStep={onEditStep}
             />
           ) : (

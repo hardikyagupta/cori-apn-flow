@@ -122,6 +122,9 @@ export interface AudienceDraft {
   include: string;
   excludes: { id: string; name: string; text: string; reach: number }[];
   strategy: string;
+  /** The goal the audience was cut for, and why this cut suits it. */
+  goal: string;
+  why: string;
   /** Refined once the holdback question has been answered. */
   refined: boolean;
 }
@@ -194,6 +197,13 @@ export function buildAudienceDraft(state: AudienceAgentState): AudienceDraft {
     include: `${phrase} in the last ${win.label}${state.excludeCheckout !== false ? " and haven't completed checkout" : ""}.`,
     excludes,
     strategy,
+    goal: state.focus ?? FOCUS_RECOVER,
+    why:
+      interest === INTEREST_VIEWED
+        ? "They've shown interest but haven't committed. Expect a broader, slower lift than cart abandoners."
+        : interest === INTEREST_BOTH
+          ? "Covers shoppers at every stage of intent. The widest reach, with a mixed lift."
+          : "Shoppers with items waiting in their cart are your warmest group. Expect the fastest, strongest lift.",
     refined,
   };
 }

@@ -9,6 +9,7 @@ import { reachFor, type AudienceValues } from "./CampaignAudienceStep";
 import { describeSlot, sliceSummaryLabel, type ScheduleValues } from "./CampaignScheduleStep";
 import type { ContentValues } from "./CampaignContentStep";
 import type { PushCampaignPrefill } from "@/data/pushCartFlow";
+import { AndroidPreview, IosPreview, hasDraftContent, type RegularLayoutDraft } from "./PushRegularLayoutEditor";
 
 const nf = new Intl.NumberFormat("en-US");
 
@@ -75,6 +76,7 @@ export default function PushPreviewBody({
   content,
   schedule,
   pushDetails,
+  customDraft,
   onEditStep,
 }: {
   campaignId: string;
@@ -84,6 +86,8 @@ export default function PushPreviewBody({
   content: ContentValues;
   schedule: ScheduleValues;
   pushDetails?: PushCampaignPrefill["details"];
+  /** The Regular layout notification written on the Content step, if any. */
+  customDraft?: RegularLayoutDraft;
   onEditStep: (stepId: string) => void;
 }) {
   const [refreshing, setRefreshing] = useState(false);
@@ -93,6 +97,7 @@ export default function PushPreviewBody({
   const [layout, setLayout] = useState<"expanded" | "collapsed">("expanded");
   const tags = parseTags(setup.tags);
   const template = appPushTemplates.find((t) => t.id === content.templateId);
+  const custom = !template && customDraft && hasDraftContent(customDraft) ? customDraft : null;
   const reach = reachFor(audience);
 
   const audienceSummary =
@@ -264,8 +269,15 @@ export default function PushPreviewBody({
       <Section icon={LayoutTemplate} title="Content" onEdit={() => onEditStep("content")}>
         <Row label="Landing page:">App Homepage</Row>
         <Row label="Template:">
-          {template ? `${template.name} · ID ${template.id}` : "Not selected"}
+          {template ? `${template.name} · ID ${template.id}` : custom ? "Custom notification · Regular layout" : "Not selected"}
         </Row>
+        {custom && (
+          <>
+            <Row label="Title:">{custom.title}</Row>
+            <Row label="Message:">{custom.message}</Row>
+            <Row label="Rich media:">{custom.android.richMedia || custom.ios.richMedia ? "Image" : "None"}</Row>
+          </>
+        )}
         {pushDetails && (
           <>
             <Row label="Title:">{pushDetails.title}</Row>
@@ -315,7 +327,11 @@ export default function PushPreviewBody({
             </div>
           )}
 
-          {template?.pushPreviews ? (
+          {custom ? (
+            <div className="mt-4 flex justify-center overflow-x-auto pb-2">
+              {os === "android" ? <AndroidPreview draft={custom} view={layout} /> : <IosPreview draft={custom} view={layout} />}
+            </div>
+          ) : template?.pushPreviews ? (
             <img
               src={template.pushPreviews[`${os}-${layout}`]}
               alt={`${template.name} on ${os}`}
