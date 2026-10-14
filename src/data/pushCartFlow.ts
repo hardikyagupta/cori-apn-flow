@@ -63,7 +63,129 @@ export function isCartFeedbackPrompt(message: string): boolean {
 /** What the wizard's Content step hands Cori so a drafted notification lands
  *  in the editor. */
 export interface ContentAgentHost {
-  onDraft: (draft: { title: string; message: string; version: number; media?: string }) => void;
+  onDraft: (draft: {
+    title: string;
+    message: string;
+    version: number;
+    media?: string;
+    /** A quick reply template: the action button the customer taps to answer. */
+    quickReply?: { buttonText: string };
+  }) => void;
+  /** Swap one line of the notification for a variation's line. */
+  onField?: (field: VariationField, value: string) => void;
+}
+
+export type VariationField = "title" | "message" | "buttonText" | "image";
+
+/** One way of writing the quick reply notification. */
+export interface PushVariation {
+  name: string;
+  title: string;
+  message: string;
+  buttonText: string;
+  /** The image Cori generates for this angle. */
+  image: string;
+}
+
+/** The three angles Cori writes the quick reply in; the first goes in the editor. */
+export function quickReplyVariations(product: string): PushVariation[] {
+  const first = quickReplyDraft(product);
+  const herbal = /herbal/i.test(product);
+  const subject = herbal ? "herbal skincare" : product.toLowerCase();
+  return [
+    { name: "Offer Awareness", ...first, image: "/campaign-assets/regular-layout/qr-variation-1.jpg" },
+    {
+      name: "Curiosity-led",
+      title: `Your ${subject} favourites await! 🌿`,
+      message: "Curious about our 20% OFF offer? Reply to discover more.",
+      buttonText: "TELL ME MORE",
+      image: "/campaign-assets/regular-layout/qr-variation-2.jpg",
+    },
+    {
+      name: "Urgency-led",
+      title: "Don't miss 20% OFF! 🎁",
+      message: `Your ${subject} deal awaits. Reply now to know more before the offer ends!`,
+      buttonText: "REVEAL OFFER",
+      image: "/campaign-assets/regular-layout/qr-variation-3.jpg",
+    },
+  ];
+}
+
+// — "I want to send a brochure…" — Cori recommends and builds a quick reply template —
+
+/** An offer the marketer wants customers to respond to. */
+export function isBrochurePrompt(message: string): boolean {
+  return /brochure|interested in the offer/i.test(message);
+}
+
+export const QR_PRODUCTS = ["Herbal creams", "Face serum", "Skincare combo"];
+
+export const QR_PRODUCT_QUESTION: FlowQuestion = {
+  id: "product",
+  title: "Which product would you like to feature in the offer?",
+  options: QR_PRODUCTS,
+  required: true,
+  confirmLabel: "Continue",
+};
+
+export const QR_TYPE_YES = "Quick reply layout";
+export const QR_TYPE_EXPLORE = "Explore other layouts";
+
+export const QR_TYPE_QUESTION: FlowQuestion = {
+  id: "type",
+  title: "Would you like to proceed with a quick reply layout or explore other App Push layout types?",
+  options: [QR_TYPE_YES, QR_TYPE_EXPLORE],
+  required: true,
+  confirmLabel: "Continue",
+};
+
+/** How the notification should read — one theme, or all three to compare. */
+export const QR_THEMES = [
+  { name: "Offer Awareness", label: "Offer Awareness (Highlight the 20% discount and explain the offer)" },
+  { name: "Curiosity-led", label: "Curiosity-led (Spark interest and encourage customers to discover more.)" },
+  { name: "Urgency-led", label: "Urgency-led (Create urgency and encourage customers to act quickly.)" },
+];
+export const QR_THEME_ALL = "All of the above";
+
+export const QR_THEME_QUESTION: FlowQuestion = {
+  id: "theme",
+  title: "What theme would you like to use for your App Push content?",
+  options: [...QR_THEMES.map((t) => t.label), QR_THEME_ALL],
+  required: true,
+  confirmLabel: "Continue",
+};
+
+/** The theme names a picked option stands for. */
+export function themesFor(answer: string): string[] {
+  const one = QR_THEMES.find((t) => answer.startsWith(t.name));
+  return one ? [one.name] : QR_THEMES.map((t) => t.name);
+}
+
+/** The first quick reply template Cori writes, for the product the marketer picked. */
+export function quickReplyDraft(product: string) {
+  return {
+    title: `${product} @20% OFF`,
+    message: "Reply to know more about the offer before it ends!",
+    buttonText: "REPLY NOW",
+  };
+}
+
+/** The image Cori adds when asked — a product shot of the herbal creams. */
+export const QR_IMAGE = "/campaign-assets/regular-layout/herbal-creams.jpg";
+
+export function qrImageFeedback(product: string): string {
+  return `Variation 1 looks ok, add an image of the ${product.toLowerCase()} to the notification.`;
+}
+
+/** "Variation 2 looks ok…" — which of the variations the marketer settled on, if any. */
+export function pickedVariation(message: string): number | null {
+  const m = message.match(/variation\s*(\d)/i);
+  return m ? Number(m[1]) : null;
+}
+
+/** The marketer is asking for a picture on the notification. */
+export function isQrImagePrompt(message: string): boolean {
+  return /(image|photo|picture|banner)/i.test(message);
 }
 
 /** "cancel", "start over", "never mind" — the marketer wants out of the scripted flow. */
@@ -360,6 +482,10 @@ export function prefillFrom(d: PushCartDraft): PushCampaignPrefill {
 /** Events the flow's cards send back up to the chat. */
 export type PushFlowEvent =
   | { type: "questions"; stage: number | string; answers: FlowAnswers; questions: FlowQuestion[] }
+  /** One line of a copy variation sent to the editor. */
+  | { type: "field"; field: VariationField; value: string }
+  /** The marketer chose a whole variation with its Use button. */
+  | { type: "useVariation"; variation: PushVariation; withImage: boolean }
   | { type: "content"; draft: PushCartDraft }
   | { type: "changes" }
   | { type: "preview"; draft: PushCartDraft };
@@ -368,4 +494,5 @@ export type PushFlowCard =
   | { kind: "questions"; stage: number | string; questions: FlowQuestion[] }
   | { kind: "content"; draft: PushCartDraft; needsPromo: boolean; version?: number; superseded?: boolean }
   | { kind: "brief"; draft: PushCartDraft }
-  | { kind: "audience"; draft: AudienceDraftView };
+  | { kind: "audience"; draft: AudienceDraftView }
+  | { kind: "variations"; variations: PushVariation[] };

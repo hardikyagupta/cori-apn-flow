@@ -31,6 +31,17 @@ import {
   isCancelPrompt,
   isCartReminderPrompt,
   CART_REMINDER_V1,
+  isBrochurePrompt,
+  isQrImagePrompt,
+  qrImageFeedback,
+  quickReplyVariations,
+  pickedVariation,
+  QR_IMAGE,
+  QR_PRODUCT_QUESTION,
+  QR_TYPE_QUESTION,
+  QR_TYPE_YES,
+  QR_THEME_QUESTION,
+  themesFor,
   PUSH_CONTENT_CTA,
   CART_REMINDER_V2,
   CART_V2_FEEDBACK,
@@ -2516,6 +2527,139 @@ The content has been updated across all channels to reflect your changes.`;
   // 1 once v1 is on screen and waiting for feedback; 2 after v2.
   const cartVersionRef = useRef(0);
 
+  // The brochure flow: product → template type → quick reply template → image.
+  const SHOW_QR_IMAGE_SUGGESTION = false;
+  const qrRef = useRef<{ stage: 'idle' | 'v1'; product: string; applied: { title: string; message: string; buttonText: string; image?: string } | null }>({ stage: 'idle', product: 'Herbal creams', applied: null });
+
+  const startQuickReplyFlow = (message: string) => {
+    qrRef.current = { stage: 'idle', product: 'Herbal creams', applied: null };
+    cartVersionRef.current = 0;
+    const sentMsgIndex = messages.length;
+    appendUserTurn({ content: message, navLabel: 'Quick reply' });
+    setTimeout(() => {
+      document.getElementById(`msg-${sentMsgIndex}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 80);
+    playCoriReply(
+      {
+        content: 'Happy to help with that. I just need to know which offer this is for.',
+        pushFlowCard: { kind: 'questions', stage: 'qr-product', questions: [QR_PRODUCT_QUESTION] },
+      },
+      ['Reading what you want to send', 'Checking which offers are live'],
+      2,
+      PUSH_LOADER_LABELS.questions,
+    );
+  };
+
+  const handleQuickReplyEvent = (event: Extract<PushFlowEvent, { type: 'questions' }>) => {
+    setDockedQuestions(null);
+    const recap: QuestionRecapEntry[] = event.questions
+      .filter(q => q.id in event.answers)
+      .map(q => ({ title: q.title, answer: event.answers[q.id] ?? 'Skipped' }));
+    appendUserTurn({ content: '', questionRecap: recap });
+
+    if (event.stage === 'qr-product') {
+      qrRef.current.product = (event.answers.product ?? 'Herbal creams').trim() || 'Herbal creams';
+      playCoriReply(
+        {
+          content: 'A quick reply template would be a good fit for your offer. It lets customers respond directly from the notification to express interest.',
+          pushFlowCard: { kind: 'questions', stage: 'qr-type', questions: [QR_TYPE_QUESTION] },
+        },
+        ['Matching the offer to a template type', 'Comparing how each type drives responses'],
+        3,
+        PUSH_LOADER_LABELS.questions,
+      );
+      return;
+    }
+
+    // qr-type, explore: hand back to the layout picker.
+    if (event.stage === 'qr-type' && event.answers.type !== QR_TYPE_YES) {
+      playCoriReply(
+        { content: "Sure. Pick a layout from the Content step, or tell me what you'd like the notification to do and I'll suggest one." },
+        undefined,
+        2,
+        PUSH_LOADER_LABELS.reply,
+      );
+      return;
+    }
+    if (event.stage === 'qr-type') {
+      // Before writing anything, settle how the notification should read.
+      playCoriReply(
+        {
+          content: 'Great choice. Before I write it, let’s decide how the notification should read.',
+          pushFlowCard: { kind: 'questions', stage: 'qr-theme', questions: [QR_THEME_QUESTION] },
+        },
+        undefined,
+        2,
+        PUSH_LOADER_LABELS.questions,
+      );
+      return;
+    }
+
+    // qr-theme: write the picked theme, or all three to compare.
+    const { product } = qrRef.current;
+    const themes = themesFor(event.answers.theme ?? '');
+    const variations = quickReplyVariations(product).filter((v) => themes.includes(v.name));
+    qrRef.current.stage = 'v1';
+    // Nothing goes in the editor until the marketer picks a variation.
+    qrRef.current.applied = null;
+    playCoriReply(
+      {
+        content:
+          variations.length > 1
+            ? '<p>I’ve created the template in three variations. Choose Use on the one you like to add it to the editor and preview, then tell me what you’d like to change.</p>'
+            : `<p>I’ve created the template in the ${variations[0].name} theme. Choose Use to add it to the editor and preview, then tell me what you’d like to change.</p>`,
+        pushFlowCard: { kind: 'variations', variations },
+      },
+      ['Choosing the quick reply layout', variations.length > 1 ? 'Writing three angles on the offer' : `Writing the ${variations[0].name.toLowerCase()} copy`, 'Adding a reply button'],
+      3,
+      PUSH_LOADER_LABELS.draft,
+    );
+    // The image request is parked as a one-tap reply for now; typing it still works.
+    if (SHOW_QR_IMAGE_SUGGESTION) {
+      window.setTimeout(() => {
+        setDynamicSuggestions([qrImageFeedback(product)]);
+        setShowSuggestions(true);
+      }, 7500);
+    }
+  };
+
+  /** "Add an image…": the same template, now with the product photo. */
+  const startQuickReplyImage = (message: string) => {
+    qrRef.current.stage = 'idle';
+    setDynamicSuggestions(null);
+    const { product } = qrRef.current;
+    // "Variation 2 looks ok…" settles on that variation; otherwise keep
+    // whatever lines are in the editor now.
+    const n = pickedVariation(message);
+    const variations = quickReplyVariations(product);
+    const draft = (n && variations[n - 1]) || qrRef.current.applied || variations[0];
+    const image = ('image' in draft && draft.image) || variations[0].image || QR_IMAGE;
+    const sentMsgIndex = messages.length;
+    appendUserTurn({ content: message, navLabel: 'Quick reply v2' });
+    setTimeout(() => {
+      document.getElementById(`msg-${sentMsgIndex}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 80);
+    playCoriReply(
+      {
+        content: `<p>I’ve added an image of the ${product.toLowerCase()} to ${n && variations[n - 1] ? `Variation ${n} (${variations[n - 1].name})` : 'your notification'}. The editor and preview are updated with its title, message and reply button.</p>`,
+      },
+      ['Finding a product image', 'Adding it to the notification'],
+      2,
+      PUSH_LOADER_LABELS.draft,
+    );
+    window.setTimeout(
+      () =>
+        contentAgent?.onDraft({
+          title: draft.title,
+          message: draft.message,
+          version: 2,
+          media: image,
+          quickReply: { buttonText: draft.buttonText },
+        }),
+      2700,
+    );
+  };
+
   const startCartReminder = (message: string) => {
     cartVersionRef.current = 1;
     const sentMsgIndex = messages.length;
@@ -2815,8 +2959,51 @@ The content has been updated across all channels to reflect your changes.`;
 
   const handlePushFlowEvent = (event: PushFlowEvent) => {
     const flow = pushFlowRef.current;
+    if (event.type === 'useVariation') {
+      const { variation } = event;
+      qrRef.current.applied = {
+        title: variation.title,
+        message: variation.message,
+        buttonText: variation.buttonText,
+        image: variation.image,
+      };
+      contentAgent?.onDraft({
+        title: variation.title,
+        message: variation.message,
+        version: 1,
+        // The image only goes in once it has finished generating.
+        media: event.withImage ? variation.image : undefined,
+        quickReply: { buttonText: variation.buttonText },
+      });
+      return;
+    }
+    if (event.type === 'field') {
+      // Lines can be mixed from any variation. The first one sent opens the
+      // quick reply editor with just that line in it.
+      if (!qrRef.current.applied) {
+        const applied = { title: '', message: '', buttonText: '', [event.field]: event.value } as {
+          title: string; message: string; buttonText: string; image?: string;
+        };
+        qrRef.current.applied = applied;
+        contentAgent?.onDraft({
+          title: applied.title,
+          message: applied.message,
+          version: 1,
+          media: applied.image,
+          quickReply: { buttonText: applied.buttonText || 'REPLY NOW' },
+        });
+        return;
+      }
+      qrRef.current.applied = { ...qrRef.current.applied, [event.field]: event.value };
+      contentAgent?.onField?.(event.field, event.value);
+      return;
+    }
     if (event.type === 'questions' && typeof event.stage === 'string' && event.stage.startsWith('aud-')) {
       handleAudienceEvent(event);
+      return;
+    }
+    if (event.type === 'questions' && typeof event.stage === 'string' && event.stage.startsWith('qr-')) {
+      handleQuickReplyEvent(event);
       return;
     }
     if (event.type === 'questions' && event.stage === 0) {
@@ -3244,6 +3431,18 @@ The content has been updated across all channels to reflect your changes.`;
     // Cori's App Push cart-recovery conversation outranks the generic stories
     // below — its prompt would otherwise match a deep-research opener.
     if (conversationVariant === 'campaigns') {
+      if (contentAgent && dockedQuestions && String(dockedQuestions.stage).startsWith('qr-')) {
+        answerOrReDock(message);
+        return;
+      }
+      if (contentAgent && isBrochurePrompt(message)) {
+        startQuickReplyFlow(message);
+        return;
+      }
+      if (contentAgent && qrRef.current.stage === 'v1' && isQrImagePrompt(message)) {
+        startQuickReplyImage(message);
+        return;
+      }
       if (contentAgent && cartVersionRef.current === 1 && isCartFeedbackPrompt(message)) {
         startCartReminderV2(message);
         return;

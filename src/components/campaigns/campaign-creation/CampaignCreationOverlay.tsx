@@ -541,7 +541,7 @@ export default function CampaignCreationOverlay({
   const [pushDraft, setPushDraft] = useState<RegularLayoutDraft>(EMPTY_REGULAR_DRAFT);
   // What Cori built for this App Push campaign, as opposed to set by hand.
   const [coriMade, setCoriMade] = useState({ audience: false, content: false });
-  const [contentSeed, setContentSeed] = useState<{ title: string; message: string; media?: string; n: number } | null>(null);
+  const [contentSeed, setContentSeed] = useState<{ title: string; message: string; media?: string; buttonText?: string; n: number } | null>(null);
   const [chatTopic, setChatTopic] = useState<SeededTopic | null>(null);
   const [followUpTopic, setFollowUpTopic] = useState<SeededTopic | null>(null);
   const [followUpSeq, setFollowUpSeq] = useState(0);
@@ -1502,9 +1502,26 @@ export default function CampaignCreationOverlay({
           isPushChannel && chatStepId === "content"
             ? {
                 onDraft: (d) => {
-                  setContentSeed({ title: d.title, message: d.message, media: d.media, n: Date.now() });
+                  setContentSeed({ title: d.title, message: d.message, media: d.media, buttonText: d.quickReply?.buttonText, n: Date.now() });
                   setCoriMade((m) => ({ ...m, content: true }));
                 },
+                onField: (field, value) =>
+                  setPushDraft((d) =>
+                    field === "image"
+                      ? {
+                          ...d,
+                          apnInteractions: true,
+                          android: { ...d.android, richMedia: true, mediaKind: "image", mediaSource: "url", mediaUrl: value },
+                          ios: { ...d.ios, richMedia: true, mediaKind: "image", mediaSource: "url", mediaUrl: value },
+                        }
+                      : field === "buttonText"
+                      ? {
+                          ...d,
+                          android: { ...d.android, actionButtons: true, buttons: [{ url: "", ...d.android.buttons[0], label: value }] },
+                          ios: { ...d.ios, actionButtons: true, buttons: [{ url: "", ...d.ios.buttons[0], label: value }] },
+                        }
+                      : { ...d, [field]: value },
+                  ),
               }
             : undefined
         }

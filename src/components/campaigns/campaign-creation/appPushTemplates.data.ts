@@ -16,6 +16,12 @@ import couponExpiryIosExpanded from "/campaign-assets/template-thumbs/tpl-push-c
 import couponExpiryIosCollapsed from "/campaign-assets/template-thumbs/tpl-push-coupon-expiry-ios-collapsed.png";
 import couponExpiryAndroidExpanded from "/campaign-assets/template-thumbs/tpl-push-coupon-expiry-android-expanded.png";
 import couponExpiryAndroidCollapsed from "/campaign-assets/template-thumbs/tpl-push-coupon-expiry-android-collapsed.png";
+import nightCareStrip from "/campaign-assets/template-thumbs/parts/night-care-strip.png";
+import nightCareLogo from "/campaign-assets/template-thumbs/parts/night-care-logo.png";
+import flashSaleBanner from "/campaign-assets/template-thumbs/parts/flash-sale-banner.png";
+import flashSaleLogo from "/campaign-assets/template-thumbs/parts/flash-sale-logo.png";
+import boatStrip from "/campaign-assets/template-thumbs/parts/boat-strip.png";
+import boatLogo from "/campaign-assets/template-thumbs/parts/boat-logo.png";
 import type { EmailTemplate } from "./emailTemplates.data";
 
 /** Templates the AI flow drafts for its prompts (see pushAIScenarios.data). */
@@ -68,7 +74,36 @@ export const appPushTemplates: EmailTemplate[] = [
       "android-collapsed": herbalCreamsAndroidCollapsed,
     },
   },
-  { id: 80002, name: "Night-Care Collection", preview: "push-carousel", image: thumbNightCare },
-  { id: 80003, name: "Flash Sale Countdown", preview: "push-timer", image: thumbFlashSale },
-  { id: 80004, name: "boAt Headphones Drop", preview: "none", image: thumbBoatHeadphones },
+  {
+    id: 80002,
+    name: "Night-Care Collection",
+    preview: "push-carousel",
+    image: thumbNightCare,
+    pushCard: {
+      brand: { name: "VogueLux", logo: nightCareLogo },
+      title: "Don’t worry we got you covered",
+      message: "Explore our latest collection of night-care products",
+      strip: nightCareStrip,
+    },
+  },
+  {
+    id: 80003,
+    name: "Flash Sale Countdown",
+    preview: "push-timer",
+    image: thumbFlashSale,
+    pushCard: {
+      brand: { name: "Brand name", logo: flashSaleLogo },
+      title: "5 DAYS TO SALE! 🚨",
+      message: "Buy before the sale ends!",
+      timer: "03:00:00",
+      banner: flashSaleBanner,
+    },
+  },
+  {
+    id: 80004,
+    name: "boAt Headphones Drop",
+    preview: "none",
+    image: thumbBoatHeadphones,
+    pushCard: { brand: { name: "boAt", logo: boatLogo, meta: "now" }, strip: boatStrip },
+  },
 ];

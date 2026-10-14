@@ -60,6 +60,12 @@ export interface PlatformConfig {
 }
 
 export interface RegularLayoutDraft {
+  /** A quick reply template is the same notification with a reply button the
+   *  customer answers from. */
+  kind: "regular" | "quickReply";
+  /** Quick reply (Android): the hint in the reply box and the thank-you text. */
+  replyPlaceholder: string;
+  replySubmission: string;
   title: string;
   message: string;
   landing: string;
@@ -96,6 +102,9 @@ export function hasDraftContent(d: RegularLayoutDraft): boolean {
 }
 
 export const EMPTY_REGULAR_DRAFT: RegularLayoutDraft = {
+  kind: "regular",
+  replyPlaceholder: "",
+  replySubmission: "",
   title: "",
   message: "",
   landing: "App Homepage",
@@ -106,6 +115,12 @@ export const EMPTY_REGULAR_DRAFT: RegularLayoutDraft = {
   addOns: false,
   addOnPairs: [{ key: "", value: "" }],
 };
+
+/** The reply button's label as the preview shows it. */
+const DEFAULT_REPLY_LABEL = "REPLY NOW";
+function replyLabel(cfg: PlatformConfig): string {
+  return (cfg.buttons[0]?.label ?? "").trim() || DEFAULT_REPLY_LABEL;
+}
 
 const LANDING_OPTIONS = [
   "App Homepage",
@@ -282,10 +297,17 @@ function PlatformFields({
   platform,
   cfg,
   set,
+  quickReply,
 }: {
   platform: Platform;
   cfg: PlatformConfig;
   set: (patch: Partial<PlatformConfig>) => void;
+  /** Quick reply templates swap "Action buttons" for one always-on reply button. */
+  quickReply?: {
+    placeholder: string;
+    submission: string;
+    onChange: (patch: Partial<Pick<RegularLayoutDraft, "replyPlaceholder" | "replySubmission">>) => void;
+  };
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const urlBad =
@@ -455,6 +477,52 @@ function PlatformFields({
         </div>
       </FeatureRow>
 
+      {quickReply ? (
+        <div className="border-t border-[#DDE2EE] px-6 py-6">
+          <p className="font-manrope text-sm font-semibold text-[#17173A]">
+            Action button
+          </p>
+          <div className="mt-5 flex flex-col gap-5">
+            <div>
+              <Label required>Button text</Label>
+              <input
+                className={fieldClass}
+                value={cfg.buttons[0]?.label ?? ""}
+                maxLength={20}
+                onChange={(e) =>
+                  set({
+                    actionButtons: true,
+                    buttons: [{ url: "", ...cfg.buttons[0], label: e.target.value }],
+                  })
+                }
+                placeholder="Ex: REPLY NOW"
+              />
+            </div>
+            {platform === "android" && (
+              <>
+                <div>
+                  <Label>Placeholder text for response</Label>
+                  <input
+                    className={fieldClass}
+                    value={quickReply.placeholder}
+                    onChange={(e) => quickReply.onChange({ replyPlaceholder: e.target.value })}
+                    placeholder="Ex: Type your message here"
+                  />
+                </div>
+                <div>
+                  <Label>Message submission text</Label>
+                  <input
+                    className={fieldClass}
+                    value={quickReply.submission}
+                    onChange={(e) => quickReply.onChange({ replySubmission: e.target.value })}
+                    placeholder="Ex: Thank you for your message"
+                  />
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      ) : (
       <FeatureRow
         title="Action buttons"
         checked={cfg.actionButtons}
@@ -519,6 +587,7 @@ function PlatformFields({
           </DsButton>
         )}
       </FeatureRow>
+      )}
 
       {platform === "android" && (
         <FeatureRow
@@ -607,6 +676,7 @@ function NotificationText({
           className={cn(
             "font-manrope font-semibold leading-[1.2] tracking-[0.29px]",
             compact ? "text-[13px]" : "text-sm",
+            draft.kind === "quickReply" && "truncate font-bold",
           )}
         >
           {draft.title}
@@ -622,6 +692,7 @@ function NotificationText({
           className={cn(
             "font-manrope leading-[1.3] tracking-[0.25px]",
             compact ? "text-[11px]" : "text-xs",
+            draft.kind === "quickReply" && "truncate",
           )}
         >
           {draft.message}
@@ -631,7 +702,20 @@ function NotificationText({
   );
 }
 
-function ActionRow({ cfg }: { cfg: PlatformConfig }) {
+function ActionRow({
+  draft,
+  cfg,
+}: {
+  draft: RegularLayoutDraft;
+  cfg: PlatformConfig;
+}) {
+  if (draft.kind === "quickReply") {
+    return (
+      <p className="px-[15px] pb-3 pt-1 font-manrope text-xs font-semibold uppercase tracking-[0.42px] text-black">
+        {replyLabel(cfg)}
+      </p>
+    );
+  }
   const buttons = cfg.actionButtons
     ? cfg.buttons.filter((b) => b.label.trim())
     : [];
@@ -660,6 +744,7 @@ export function AndroidPreview({
   const cfg = draft.android;
   const expanded = view === "expanded";
   const src = mediaSrc(cfg);
+  const quick = draft.kind === "quickReply";
   return (
     <div className="relative h-[654px] w-[348px] shrink-0">
       <div className="absolute inset-0 overflow-hidden" aria-hidden>
@@ -705,18 +790,31 @@ export function AndroidPreview({
         </div>
         <div className="flex min-h-[49px] items-center justify-between gap-[10px] px-[15px] py-[10px]">
           <NotificationText draft={draft} cfg={cfg} />
-          <span className="grid size-[33px] shrink-0 place-items-center rounded-[7px] border border-[#DDE2EE] bg-[#DDE2EE]">
-            <img src={imgLogo} alt="" className="size-6 max-w-none" />
-          </span>
+          {quick && !expanded && src ? (
+            <img
+              src={src}
+              alt=""
+              className="size-[33px] shrink-0 rounded-[6px] object-cover"
+            />
+          ) : (
+            <span className="grid size-[33px] shrink-0 place-items-center rounded-[7px] border border-[#DDE2EE] bg-[#DDE2EE]">
+              <img src={imgLogo} alt="" className="size-6 max-w-none" />
+            </span>
+          )}
         </div>
         {expanded && src && (
           <img
             src={src}
             alt=""
-            className="mx-px mb-px block h-[137px] w-[297px] rounded-[3px] object-cover"
+            className={cn(
+              "block object-cover",
+              quick
+                ? "mx-[15px] mb-2 h-[98px] w-[269px] rounded-[3px]"
+                : "mx-px mb-px h-[137px] w-[297px] rounded-[3px]",
+            )}
           />
         )}
-        {expanded && <ActionRow cfg={cfg} />}
+        {(expanded || quick) && <ActionRow draft={draft} cfg={cfg} />}
       </div>
     </div>
   );
@@ -732,6 +830,7 @@ export function IosPreview({
   const cfg = draft.ios;
   const expanded = view === "expanded";
   const src = mediaSrc(cfg);
+  const quick = draft.kind === "quickReply";
   return (
     <div className="relative h-[582px] w-[305px] shrink-0">
       <div className="absolute inset-0 overflow-hidden rounded-[32px] border-4 border-solid border-black bg-[#F4F8FF]">
@@ -743,33 +842,46 @@ export function IosPreview({
       </div>
       <div
         className={cn(
-          "absolute left-[11.5px] w-[282px] overflow-hidden bg-white",
-          expanded ? "top-[27px] rounded-[14px]" : "top-[25px] rounded-[18px]",
+          "absolute left-[11.5px] w-[282px]",
+          expanded ? "top-[27px]" : "top-[25px]",
         )}
-        style={{ background: backgroundFor(cfg) }}
       >
-        <div className="flex items-center gap-[10px] p-[10px]">
-          <span className="grid size-[33px] shrink-0 place-items-center rounded-[7px] border border-[#DDE2EE] bg-[#DDE2EE]">
-            <img src={imgLogo} alt="" className="size-6 max-w-none" />
-          </span>
-          <NotificationText draft={draft} cfg={cfg} compact={!expanded} />
-          {/* Collapsed iOS keeps the banner as a thumbnail on the right. */}
-          {!expanded && src && (
+        <div
+          className={cn(
+            "overflow-hidden bg-white",
+            expanded ? "rounded-[14px]" : "rounded-[18px]",
+          )}
+          style={{ background: backgroundFor(cfg) }}
+        >
+          <div className="flex items-center gap-[10px] p-[10px]">
+            <span className="grid size-[33px] shrink-0 place-items-center rounded-[7px] border border-[#DDE2EE] bg-[#DDE2EE]">
+              <img src={imgLogo} alt="" className="size-6 max-w-none" />
+            </span>
+            <NotificationText draft={draft} cfg={cfg} compact={!expanded} />
+            {/* Collapsed iOS keeps the banner as a thumbnail on the right. */}
+            {!expanded && src && (
+              <img
+                src={src}
+                alt=""
+                className="size-[33px] shrink-0 rounded-[6px] object-cover"
+              />
+            )}
+          </div>
+          {expanded && src && (
             <img
               src={src}
               alt=""
-              className="size-[33px] shrink-0 rounded-[6px] object-cover"
+              className="block h-[167px] w-[282px] rounded-b-[14px] object-cover"
             />
           )}
+          {expanded && !quick && <ActionRow draft={draft} cfg={cfg} />}
         </div>
-        {expanded && src && (
-          <img
-            src={src}
-            alt=""
-            className="block h-[167px] w-[282px] rounded-b-[14px] object-cover"
-          />
+        {/* A quick reply's button sits in its own bar under the notification. */}
+        {quick && (
+          <p className="mt-1 rounded-[10px] bg-white px-[10px] py-2 font-manrope text-sm font-medium uppercase tracking-[0.42px] text-black">
+            {replyLabel(cfg)}
+          </p>
         )}
-        {expanded && <ActionRow cfg={cfg} />}
       </div>
     </div>
   );
@@ -885,7 +997,9 @@ export default function PushRegularLayoutEditor({
 
         <div className="flex flex-col gap-[30px] px-10 pb-10 pt-8">
           <h2 className="font-manrope text-base font-bold text-[#17173A]">
-            Customise your notification
+            {draft.kind === "quickReply"
+              ? "Customize your quick reply template"
+              : "Customise your notification"}
           </h2>
 
           <div className="flex max-w-[620px] flex-col gap-[26px]">
@@ -1004,6 +1118,15 @@ export default function PushRegularLayoutEditor({
                   platform={tab}
                   cfg={draft[tab]}
                   set={setPlatform(tab)}
+                  quickReply={
+                    draft.kind === "quickReply"
+                      ? {
+                          placeholder: draft.replyPlaceholder,
+                          submission: draft.replySubmission,
+                          onChange,
+                        }
+                      : undefined
+                  }
                 />
               </>
             )}
