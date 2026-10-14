@@ -1,5 +1,9 @@
 import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
+import { Pencil, Replace, Send } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { DsButton } from "@/components/ui/ds-button";
+import { AndroidIcon, AppleIcon } from "./PlatformIcons";
+import TemplatePushMock from "./TemplatePushMock";
 import PushTemplateDrawer from "./PushTemplateDrawer";
 import PushRegularLayoutEditor, {
   EMPTY_REGULAR_DRAFT,
@@ -443,7 +447,7 @@ export default function PushContentStep({
   /** The marketer started a blank notification themselves. */
   onCreateFresh?: () => void;
   /** A notification Cori drafted — fills the editor and opens it. */
-  seed?: { title: string; message: string; media?: string; n: number } | null;
+  seed?: { title: string; message: string; media?: string; buttonText?: string; n: number } | null;
 }) {
   const [layout, setLayout] = useState<LayoutKind | "new" | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -451,15 +455,27 @@ export default function PushContentStep({
   // a notification already written lands straight in it.
   const [editing, setEditing] = useState(() => hasDraftContent(draft));
   const setDraft = onDraftChange;
+  const [previewLayout, setPreviewLayout] = useState<"expanded" | "collapsed">("expanded");
   useEffect(() => {
     if (!seed) return;
     // A banner turns on Rich media (Image, by URL) for both platforms.
     const media = seed.media ? { richMedia: true, mediaKind: "image" as const, mediaSource: "url" as const, mediaUrl: seed.media } : null;
+    // A quick reply template carries one reply button on both platforms.
+    const reply = seed.buttonText
+      ? { actionButtons: true, buttons: [{ label: seed.buttonText, url: "" }] }
+      : null;
     setDraft((d) => ({
       ...d,
+      kind: seed.buttonText ? "quickReply" : "regular",
       title: seed.title,
       message: seed.message,
-      ...(media ? { apnInteractions: true, android: { ...d.android, ...media }, ios: { ...d.ios, ...media } } : {}),
+      ...(media || reply
+        ? {
+            apnInteractions: true,
+            android: { ...d.android, ...media, ...reply },
+            ios: { ...d.ios, ...media, ...reply },
+          }
+        : {}),
     }));
     setLayout("new");
     setEditing(true);
@@ -468,8 +484,13 @@ export default function PushContentStep({
 
   // "Create new" always opens a blank notification — whatever was in the editor
   // before (a template, an earlier draft) is not carried over.
-  const startFresh = () => {
-    setDraft(() => EMPTY_REGULAR_DRAFT);
+  const startFresh = (kind: "regular" | "quickReply" = "regular") => {
+    setDraft(() =>
+      kind === "quickReply"
+        ? { ...EMPTY_REGULAR_DRAFT, kind, apnInteractions: true }
+        : EMPTY_REGULAR_DRAFT,
+    );
+    onChange({ templateId: null });
     onCreateFresh?.();
     setLayout("new");
     setEditing(true);
@@ -486,6 +507,7 @@ export default function PushContentStep({
       }}
       onSelect={(id) => {
         onChange({ templateId: id });
+        setEditing(false);
         setDrawerOpen(false);
       }}
     />
@@ -499,6 +521,99 @@ export default function PushContentStep({
           onChange={(patch) => setDraft((d) => ({ ...d, ...patch }))}
           onChangeLayout={() => setEditing(false)}
         />
+        {drawer}
+      </>
+    );
+  }
+
+  // A saved template is in use: show how it looks on both platforms, with the
+  // actions that apply to it.
+  if (template) {
+    return (
+      <>
+        <div className="flex flex-col gap-[30px] rounded-lg border border-[#DDE2EE] bg-white p-[40px]">
+          <h2 className="font-manrope text-[20px] font-bold leading-none tracking-[0.42px] text-[#17173A]">
+            App push notification template
+          </h2>
+
+          <div className="rounded-[5px] border border-[#DDE2EE]">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#DDE2EE] px-6 py-4">
+              <div className="flex flex-wrap items-center gap-3">
+                <DsButton
+                  variant="tertiary"
+                  onClick={() => {
+                    // Back to the layout picker: pick another saved template from
+                    // there, or start a layout of your own.
+                    onChange({ templateId: null });
+                    setLayout(null);
+                    setEditing(false);
+                  }}
+                >
+                  <Replace /> Change template
+                </DsButton>
+                <DsButton variant="tertiary" disabled title="Editing a saved template isn't available yet">
+                  <Pencil /> Edit template
+                </DsButton>
+              </div>
+              <DsButton variant="secondary" disabled title="Sending a test isn't available yet">
+                <Send /> Send test notification
+              </DsButton>
+            </div>
+
+            <div className="px-6 py-6">
+              <div className="flex justify-end">
+                <div className="inline-flex">
+                  {(["expanded", "collapsed"] as const).map((l, i) => (
+                    <button
+                      key={l}
+                      type="button"
+                      aria-pressed={previewLayout === l}
+                      onClick={() => setPreviewLayout(l)}
+                      className={cn(
+                        "flex h-9 cursor-pointer items-center border px-4 font-manrope text-sm font-semibold capitalize transition-colors",
+                        i === 0 ? "rounded-l-md" : "-ml-px rounded-r-md",
+                        previewLayout === l
+                          ? "relative z-[1] border-[#2F68E5] bg-[#2F68E5] text-white"
+                          : "border-[#DDE2EE] bg-white text-[#6F6F8D] hover:bg-[#F7F9FC]"
+                      )}
+                    >
+                      {l}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mt-6 flex flex-wrap items-start justify-center gap-x-16 gap-y-10">
+                {(
+                  [
+                    ["android", AndroidIcon],
+                    ["ios", AppleIcon],
+                  ] as const
+                ).map(([os, Icon]) => {
+                  const mock = template.pushPreviews?.[`${os}-${previewLayout}`];
+                  return (
+                    <div key={os} className="flex flex-col items-center gap-4">
+                      <Icon className="size-4 text-[#6F6F8D]" aria-label={os === "ios" ? "iOS" : "Android"} />
+                      {mock ? (
+                        <img
+                          src={mock}
+                          alt={`${template.name} on ${os === "ios" ? "iOS" : "Android"}`}
+                          className="max-h-[620px] w-auto max-w-[360px]"
+                        />
+                      ) : template.pushCard ? (
+                        <TemplatePushMock card={template.pushCard} os={os} view={previewLayout} />
+                      ) : (
+                        template.image && (
+                          <img src={template.image} alt={template.name} className="max-h-[620px] w-auto max-w-[360px]" />
+                        )
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
         {drawer}
       </>
     );
@@ -521,38 +636,6 @@ export default function PushContentStep({
           </button>
         </p>
       </div>
-
-      {template && (
-        <div className="-mt-4 flex items-center gap-4 rounded-lg border border-[#C9D7F5] bg-[#F4F8FF] p-3">
-          <span className="h-14 w-14 shrink-0 overflow-hidden rounded-md bg-white">
-            {template.image && (
-              <img
-                src={template.image}
-                alt=""
-                className="h-full w-full object-cover object-top"
-              />
-            )}
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="font-manrope text-xs font-semibold uppercase tracking-[0.4px] text-[#6F6F8D]">
-              Using template
-            </p>
-            <p className="truncate font-manrope text-sm font-semibold text-[#17173A]">
-              {template.name}{" "}
-              <span className="font-normal text-[#6F6F8D]">
-                · ID {template.id}
-              </span>
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => setDrawerOpen(true)}
-            className="dc-btn dc-btn-secondary shrink-0"
-          >
-            Change
-          </button>
-        </div>
-      )}
 
       <div className="flex flex-col gap-[10px]">
         <div className="flex flex-col gap-[20px]">
@@ -595,7 +678,12 @@ export default function PushContentStep({
                 label={l.label}
                 isNew={l.isNew}
                 selected={layout === l.id}
-                onClick={() => setLayout(l.id)}
+                onClick={() => {
+                  // Quick reply has its own editor; the other advanced layouts
+                  // only highlight for now.
+                  if (l.id === "quick") startFresh("quickReply");
+                  else setLayout(l.id);
+                }}
               >
                 <Wireframe kind={l.id} />
               </LayoutCard>

@@ -65,6 +65,8 @@ export interface EmailTemplate {
   /** App Push only — real mocks per OS/expanded combination. Falls back to
    *  `image` for any combination not covered here. */
   pushPreviews?: Partial<Record<PushPreviewKey, string>>;
+  /** App Push — what the notification says, for templates without per-platform mocks. */
+  pushCard?: import("./TemplatePushMock").PushCardContent;
 }
 
 /** The template the AI flow drafts for the "continue watching" prompt. */

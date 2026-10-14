@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
 import CoriQuestionsCard from "@/components/CoriQuestionsCard";
 import AudienceDraftCard from "@/components/campaigns/campaign-creation/AudienceDraftCard";
+import PushVariationsCard from "@/components/PushVariationsCard";
 import { appPushTemplates } from "@/components/campaigns/campaign-creation/appPushTemplates.data";
 import {
   COUNTDOWN_PREVIEW,
@@ -251,5 +252,13 @@ export default function PushFlowCardView({
       />
     );
   if (card.kind === "audience") return <AudienceDraftCard draft={card.draft} />;
+  if (card.kind === "variations")
+    return (
+      <PushVariationsCard
+        variations={card.variations}
+        onApply={(field, value) => onEvent({ type: "field", field, value })}
+        onUse={(variation, withImage) => onEvent({ type: "useVariation", variation, withImage })}
+      />
+    );
   return <BriefCard draft={card.draft} onEvent={onEvent} />;
 }
