@@ -7,6 +7,7 @@ import {
   Settings,
   UserCheck,
   Users,
+  X,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -104,6 +105,7 @@ export default function CampaignPreview({
   pushDetails,
   customDraft,
   aiMade,
+  onClose,
 }: {
   campaignId: string;
   campaignName: string;
@@ -132,6 +134,8 @@ export default function CampaignPreview({
   customDraft?: RegularLayoutDraft;
   /** App Push: parts Cori built, which the review leaves alone. */
   aiMade?: { timing?: boolean; audience?: boolean; content?: boolean };
+  /** App Push: leave the wizard altogether (back to the campaigns list). */
+  onClose?: () => void;
 }) {
   const [previewEmail, setPreviewEmail] = useState("");
   const [refreshing, setRefreshing] = useState(false);
@@ -178,7 +182,8 @@ export default function CampaignPreview({
   // A campaign Cori built from start to finish has nothing to review, so the
   // rail isn't shown at all.
   const coriBuiltAll = isPush && Boolean(aiMade?.timing && aiMade?.audience && aiMade?.content);
-  const reviewAside = !chatOpen && !coriBuiltAll && (
+  // App Push never shows the rail by default: Ask Cori runs the review in the chat.
+  const reviewAside = !chatOpen && !isPush && !coriBuiltAll && (
           
           <aside className="flex w-[380px] shrink-0 flex-col gap-5">
             <div className="rounded-lg border border-[#DDE2EE] bg-white p-4">
@@ -216,14 +221,16 @@ export default function CampaignPreview({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <header className="flex h-14 shrink-0 items-center gap-3 border-b border-[#DDE2EE] bg-white px-14">
-        <button
-          type="button"
-          onClick={onBack}
-          aria-label="Back to campaign setup"
-          className="grid size-8 place-items-center rounded text-[#17173A] transition-colors hover:bg-[#F0F3F9]"
-        >
-          <ChevronLeft className="size-5" strokeWidth={2.2} />
-        </button>
+        {!(isPush && onClose) && (
+          <button
+            type="button"
+            onClick={onBack}
+            aria-label="Back to campaign setup"
+            className="grid size-8 place-items-center rounded text-[#17173A] transition-colors hover:bg-[#F0F3F9]"
+          >
+            <ChevronLeft className="size-5" strokeWidth={2.2} />
+          </button>
+        )}
         <h1 className="truncate font-manrope text-base font-bold text-[#17173A]">
           Preview of {name}
         </h1>
@@ -235,7 +242,7 @@ export default function CampaignPreview({
           <span aria-hidden="true" className="snake-border" />
           <img src={navSparkle} alt="" className="relative z-[1] h-5 w-5" />
           <span className="relative z-[1] font-manrope text-xs font-semibold tracking-[0.42px] text-ash">
-            Ask Cori
+            {isPush ? "Audit the campaign with Cori" : "Ask Cori"}
           </span>
         </button>
         <button
@@ -245,6 +252,16 @@ export default function CampaignPreview({
         >
           {publishLabel}
         </button>
+        {isPush && onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close campaign creation"
+            className="grid h-8 w-8 place-items-center rounded border border-[#DDE2EE] text-[#6F6F8D] transition-colors hover:bg-[#F7F9FC] hover:text-[#17173A]"
+          >
+            <X className="h-4 w-4" strokeWidth={2} />
+          </button>
+        )}
       </header>
 
       <div className={cn("flex min-h-0 flex-1 gap-5", chatOpen ? "pr-5" : "")}>

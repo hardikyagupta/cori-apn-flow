@@ -31,7 +31,7 @@ import CampaignSettingsDrawer from "./CampaignSettingsDrawer";
 import CampaignCreationIntro from "./CampaignCreationIntro";
 import CampaignAIGenerating from "./CampaignAIGenerating";
 import CampaignLaunchingModal from "./CampaignLaunchingModal";
-import CampaignCreationStepper, { type Step } from "./CampaignCreationStepper";
+import CampaignCreationStepper, { useAutosave, type Step } from "./CampaignCreationStepper";
 import { isPushDraftPatchApplied } from "./SetupApplyCard";
 import CampaignAIPanel, {
   isContentPatchApplied,
@@ -539,6 +539,7 @@ export default function CampaignCreationOverlay({
   // A notification Cori drafted on the Content step; `n` makes each one a new event.
   // The Regular layout notification written on the Content step (by hand or by Cori).
   const [pushDraft, setPushDraft] = useState<RegularLayoutDraft>(EMPTY_REGULAR_DRAFT);
+  const autosave = useAutosave({ setup, audience, content, schedule, pushDraft });
   // What Cori built for this App Push campaign, as opposed to set by hand.
   const [coriMade, setCoriMade] = useState({ audience: false, content: false });
   const [contentSeed, setContentSeed] = useState<{ title: string; message: string; media?: string; buttonText?: string; n: number } | null>(null);
@@ -1380,11 +1381,36 @@ export default function CampaignCreationOverlay({
       return undefined;
     };
 
+    // A finding Cori can fix by building a segment: she builds it right here.
+    const seg = action?.audienceDraft;
+    if (seg) {
+      const exclusionsOnly = action?.audienceScope === "exclusions";
+      const holds = seg.excludes.map((e) => e.text.toLowerCase()).join(", ");
+      return {
+        prompt: finding.askLabel,
+        navLabel: finding.category,
+        reply: exclusionsOnly
+          ? `${finding.detail} I've worked out who to hold back: ${holds}.`
+          : `${finding.detail} I've built a tighter segment for you: ${seg.include.charAt(0).toLowerCase()}${seg.include.slice(1)} Holds back ${holds}.`,
+        setupApplyCard: {
+          kind: "audience",
+          title: exclusionsOnly ? "Exclusions" : seg.name,
+          applyLabel: action?.label ?? "Use this segment",
+          appliedLabel: "Applied to audience",
+          audience: exclusionsOnly
+            ? seg.excludes.map((e) => e.name).join(" · ")
+            : `${seg.name} · ${seg.reach.toLocaleString("en-US")} reachable`,
+          audienceDraft: seg,
+          audienceScope: action?.audienceScope,
+        },
+      };
+    }
+
     return {
       prompt: finding.askLabel,
       navLabel: finding.category,
       reply:
-        `${finding.detail}\n\n**Evidence** — ${finding.evidence}\n\n` +
+        `${finding.detail}\n\nEvidence: ${finding.evidence}\n\n` +
         (action
           ? "I can fix it from here, or you can open the step and do it by hand."
           : `This one needs the ${finding.link.stepLabel} step — open it and I'll stay on this thread while you change it.`),
@@ -1430,7 +1456,7 @@ export default function CampaignCreationOverlay({
     // An AI-built campaign was already drafted against the account's best-
     // performing patterns — there's nothing left for the audit to flag, so
     // skip running it and say so instead of surfacing manual-build findings.
-    if (campaignAIGenerated) {
+    if (campaignAIGenerated || (isPushChannel && pushAiMade.timing && pushAiMade.audience && pushAiMade.content)) {
       openTopic({
         prompt: "Audit this campaign before I publish it.",
         navLabel: "Audit",
@@ -1564,6 +1590,20 @@ export default function CampaignCreationOverlay({
             applyCohort(cohort);
             return;
           }
+          // App Push review: a segment Cori built, applied to the Audience step.
+          if (card.audienceDraft) {
+            if (card.audienceScope === "exclusions") {
+              setAudience((a) => ({
+                ...a,
+                excludeEnabled: true,
+                excludeSegments: card.audienceDraft!.excludes.map((e) => ({ id: e.id, name: e.name, reach: e.reach, ai: true })),
+              }));
+            } else {
+              plotAudienceDraft(card.audienceDraft);
+            }
+            setCoriMade((m) => ({ ...m, audience: card.audienceScope !== "exclusions" || m.audience }));
+            return;
+          }
           // App Push review: a change to the notification being drafted.
           if (card.pushDraftPatch) {
             setPushDraft((d) => ({ ...d, ...card.pushDraftPatch }));
@@ -1660,7 +1700,11 @@ export default function CampaignCreationOverlay({
           if (card.patch) applySetup(card.patch);
         }}
         isSetupApplyApplied={(card) =>
-          card.pushDraftPatch
+          card.audienceDraft
+            ? card.audienceScope === "exclusions"
+              ? audience.excludeEnabled && audience.excludeSegments.length > 0
+              : audience.mode === "adhoc" && audience.conditions.length === card.audienceDraft.conditions.length
+            : card.pushDraftPatch
             ? isPushDraftPatchApplied(card.pushDraftPatch, pushDraft)
             : card.contentPatch
             ? isContentPatchApplied(card.contentPatch, content)
@@ -1763,7 +1807,8 @@ export default function CampaignCreationOverlay({
             setFocusStepId(stepId);
             setPreviewOpen(false);
           }}
-          onAskCoMarketer={openFreshChat}
+          // App Push: Cori reviews the campaign when asked, not by default.
+          onAskCoMarketer={isPushChannel ? handleAuditCampaign : openFreshChat}
           onAskFinding={(finding) => openTopic(findingTopic(finding))}
           chatOpen={chatOpen}
           chatSlot={chatColumn}
@@ -1771,6 +1816,7 @@ export default function CampaignCreationOverlay({
           pushDetails={prefill?.details}
           customDraft={pushDraft}
           aiMade={pushAiMade}
+          onClose={isPushChannel ? onClose : undefined}
         />
       ) : isPushChannel ? (
         <>
@@ -1781,7 +1827,6 @@ export default function CampaignCreationOverlay({
             isLastStep={stepIndex === PUSH_STEPS.length - 1}
             onRenameCampaign={renameCampaign}
             onAskCoMarketer={openFreshChat}
-            onFinishLater={onClose}
             onNext={goNextPushStep}
             onClose={onClose}
           />
@@ -1790,7 +1835,8 @@ export default function CampaignCreationOverlay({
             activeIndex={stepIndex}
             reachedIndex={reachedIndex}
             campaignId="1234"
-            lastSaved="just now"
+            lastSaved={autosave.lastSaved}
+            saving={autosave.saving}
             onStepSelect={setStepIndex}
           />
           <div className="flex min-h-0 flex-1">

@@ -3,6 +3,20 @@ import type { ContentValues } from "./CampaignContentStep";
 import type { ScheduleValues } from "./CampaignScheduleStep";
 import { hasDraftContent, type RegularLayoutDraft } from "./PushRegularLayoutEditor";
 import type { Finding } from "./previewFindings.data";
+import { buildAudienceDraft, INTEREST_CART } from "@/data/audienceAgentFlow";
+
+/** The tighter audience Cori builds: recent cart adders who haven't bought,
+ *  with recent buyers and anyone already in a journey held back. */
+function tighterAudience() {
+  return buildAudienceDraft({
+    focus: "Recover potentially lost purchases",
+    interest: INTEREST_CART,
+    recency: "In the last 24 hours",
+    excludeCheckout: true,
+    reach: "Balanced",
+    holdbacks: ["Recent purchasers", "Already in an active journey"],
+  });
+}
 
 /**
  * What Cori says about an App Push campaign at preview time — the push
@@ -62,6 +76,7 @@ export function buildPushFindings({
       impact: "≈70% have no cart",
       detail: "A cart reminder only means something to people with something in their cart.",
       evidence: "Your broad pushes opt out at 2.4× the rate of your segmented ones.",
+      action: { label: "Use this segment", kind: "audience", audienceDraft: tighterAudience(), audienceScope: "segment" },
       link: { stepId: "audience", stepLabel: "Audience", field: "Target audience" },
     });
   } else if (reachFor(audience) === 0) {
@@ -74,6 +89,7 @@ export function buildPushFindings({
       impact: "0 reachable contacts",
       detail: "The audience step has a mode picked but no segment or condition behind it.",
       evidence: "A campaign published with an empty audience completes instantly and reports nothing.",
+      action: { label: "Use this segment", kind: "audience", audienceDraft: tighterAudience(), audienceScope: "segment" },
       link: { stepId: "audience", stepLabel: "Audience", field: "Target audience" },
     });
   }
@@ -88,6 +104,7 @@ export function buildPushFindings({
       impact: "≈6% already bought",
       detail: "Someone who checked out an hour ago would still get a reminder about the cart they just paid for.",
       evidence: "Reminders that reached recent buyers drew 3× the notification opt-outs last quarter.",
+      action: { label: "Add these exclusions", kind: "audience", audienceDraft: tighterAudience(), audienceScope: "exclusions" },
       link: { stepId: "audience", stepLabel: "Audience", field: "Exclude contacts" },
     });
   }
