@@ -6,6 +6,7 @@ import type { ContentValues } from "./CampaignContentStep";
 import type { SetupValues } from "./CampaignSetupStep";
 import { emailTemplates } from "./emailTemplates.data";
 import type { RegularLayoutDraft } from "./PushRegularLayoutEditor";
+import type { AudienceDraft } from "@/data/audienceAgentFlow";
 
 /**
  * What the co-marketer says about a campaign at preview time. These are read
@@ -36,6 +37,9 @@ export interface Finding {
     setupPatch?: Partial<SetupValues>;
     /** App Push: a change to the notification being drafted. */
     pushDraftPatch?: Partial<RegularLayoutDraft>;
+    /** App Push: a segment Cori builds for the marketer, applied from the thread. */
+    audienceDraft?: AudienceDraft;
+    audienceScope?: "segment" | "exclusions";
   };
   /** The card's one CTA, written as what the user is asking for. Doubles as
    *  the opening message of the thread it starts. */

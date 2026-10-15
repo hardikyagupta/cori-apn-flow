@@ -19,6 +19,7 @@ import type { ContentValues } from "./CampaignContentStep";
 import type { ScheduleValues } from "./CampaignScheduleStep";
 import type { AudienceCohort } from "./audienceCohorts.data";
 import type { RegularLayoutDraft } from "./PushRegularLayoutEditor";
+import type { AudienceDraft } from "@/data/audienceAgentFlow";
 
 export type SetupApplyKind =
   | "tags"
@@ -84,6 +85,9 @@ export interface SetupApplyCardData {
   contentPatch?: Partial<ContentValues>;
   /** Written onto the schedule form, for schedule-step suggestions. */
   schedulePatch?: Partial<ScheduleValues>;
+  /** A segment Cori built; "segment" plots its conditions, "exclusions" only its holdbacks. */
+  audienceDraft?: AudienceDraft;
+  audienceScope?: "segment" | "exclusions";
   /** Written onto the App Push notification being drafted. */
   pushDraftPatch?: Partial<RegularLayoutDraft>;
   /** Audience cuts — rendered as a stack, each plotted on its own. */
