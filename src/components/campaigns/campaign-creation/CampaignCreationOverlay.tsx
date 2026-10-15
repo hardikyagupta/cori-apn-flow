@@ -646,7 +646,7 @@ export default function CampaignCreationOverlay({
     setAudience({
       ...EMPTY_AUDIENCE,
       mode: "adhoc",
-      selectedApps: CONSUMER_APPS,
+      selectedApps: prefill.apps?.length ? prefill.apps : CONSUMER_APPS,
       conditions: prefill.conditions,
       conditionsReach: prefill.reach,
     });
@@ -774,18 +774,26 @@ export default function CampaignCreationOverlay({
   // that step's own conversation (Content gets the template prompts) instead of
   // carrying the previous step's thread along.
   const pushStepId = channel === "App Push Notification" ? PUSH_STEPS[stepIndex]?.id : undefined;
-  const lastPushStepId = useRef(pushStepId);
+  // App Push opens Cori by default: when the stepper first appears for a new
+  // campaign, and again on every step after that. Each step starts its own
+  // conversation (Content gets the template prompts) instead of carrying the
+  // previous step's thread along.
+  const pushWizardStep = pushStepId && mounted && !introOpen && !previewOpen ? pushStepId : undefined;
+  const lastPushStepId = useRef(pushWizardStep);
   useEffect(() => {
-    if (lastPushStepId.current === pushStepId) return;
-    lastPushStepId.current = pushStepId;
-    if (!chatOpen) return;
+    if (lastPushStepId.current === pushWizardStep) return;
+    lastPushStepId.current = pushWizardStep;
+    if (!pushWizardStep) return;
+    audienceChat.current = false;
+    setGoalApprovalOpen(false);
     setChatMessage(undefined);
     setChatTopic(null);
     setChatVariant("campaigns");
     setFollowUpTopic(null);
     setFollowUpSeq(0);
     setChatSession((n) => n + 1);
-  }, [pushStepId, chatOpen]);
+    setChatOpen(true);
+  }, [pushWizardStep]);
 
   if (!mounted) return null;
 
