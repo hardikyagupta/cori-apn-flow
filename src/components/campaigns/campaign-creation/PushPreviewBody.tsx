@@ -29,15 +29,15 @@ function Section({
 }) {
   return (
     <section className="overflow-hidden rounded-lg bg-white shadow-[0_1px_6px_rgba(23,23,58,0.08)]">
-      <header className="flex items-center gap-3 border-b border-[#EEF1F7] px-6 py-4">
+      <header className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-[#EEF1F7] px-6 py-4">
         <Icon className="size-[18px] shrink-0 text-[#6F6F8D]" strokeWidth={2} />
         <h2 className="font-manrope text-base font-bold text-[#4A4A68]">{title}</h2>
-        <div className="ml-auto flex items-center gap-3">
+        <div className="ml-auto flex flex-wrap items-center justify-end gap-x-3 gap-y-2">
           {action}
           <button
             type="button"
             onClick={onEdit}
-            className="flex h-8 items-center gap-1.5 rounded border border-[#DDE2EE] bg-white px-3 font-manrope text-xs font-semibold uppercase tracking-[0.42px] text-[#6F6F8D] transition-colors hover:bg-[#F7F9FC] hover:text-[#17173A]"
+            className="flex h-8 shrink-0 items-center gap-1.5 rounded border border-[#DDE2EE] bg-white px-3 font-manrope text-xs font-semibold uppercase tracking-[0.42px] text-[#6F6F8D] transition-colors hover:bg-[#F7F9FC] hover:text-[#17173A]"
           >
             <Pencil className="size-3.5" strokeWidth={2} />
             Edit
@@ -206,7 +206,7 @@ export default function PushPreviewBody({
           title="Audience"
           onEdit={() => onEditStep("audience")}
           action={
-            <div className="flex h-8 items-center gap-2 rounded-full border border-[#DDE2EE] bg-white pl-2 pr-3">
+            <div className="flex h-8 shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-[#DDE2EE] bg-white pl-2 pr-3">
               <UserCheck className="size-4 text-[#8A8AA3]" strokeWidth={2} />
               <span className="font-manrope text-[13px] text-[#6F6F8D]">Reachable contacts</span>
               <span className="font-manrope text-[13px] font-bold text-[#17173A]">{nf.format(reach)}</span>

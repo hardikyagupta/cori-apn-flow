@@ -664,11 +664,15 @@ function NotificationText({
   draft,
   cfg,
   compact,
+  ios,
 }: {
   draft: RegularLayoutDraft;
   cfg: PlatformConfig;
   compact?: boolean;
+  /** iOS sets the regular layout's title and message larger than Android does. */
+  ios?: boolean;
 }) {
+  const big = ios && draft.kind !== "quickReply";
   return (
     <div className="min-w-0 flex-1 break-words text-black">
       {draft.title && (
@@ -676,6 +680,7 @@ function NotificationText({
           className={cn(
             "font-manrope font-semibold leading-[1.2] tracking-[0.29px]",
             compact ? "text-[13px]" : "text-sm",
+            big && "font-bold",
             draft.kind === "quickReply" && "truncate font-bold",
           )}
         >
@@ -692,6 +697,7 @@ function NotificationText({
           className={cn(
             "font-manrope leading-[1.3] tracking-[0.25px]",
             compact ? "text-[11px]" : "text-xs",
+            big && !compact && "text-sm leading-5 tracking-[0.42px] text-[#17173A]",
             draft.kind === "quickReply" && "truncate",
           )}
         >
@@ -857,7 +863,7 @@ export function IosPreview({
             <span className="grid size-[33px] shrink-0 place-items-center rounded-[7px] border border-[#DDE2EE] bg-[#DDE2EE]">
               <img src={imgLogo} alt="" className="size-6 max-w-none" />
             </span>
-            <NotificationText draft={draft} cfg={cfg} compact={!expanded} />
+            <NotificationText draft={draft} cfg={cfg} compact={!expanded} ios />
             {/* Collapsed iOS keeps the banner as a thumbnail on the right. */}
             {!expanded && src && (
               <img

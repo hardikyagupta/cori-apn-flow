@@ -1,3 +1,4 @@
+import { APP_OPTIONS } from "@/components/campaigns/campaign-creation/appOptions.data";
 import type { AdhocCondition } from "@/components/campaigns/campaign-creation/CampaignAudienceStep";
 import type { AudienceDraftView } from "@/data/audienceAgentFlow";
 import { toLocalInput } from "@/components/campaigns/campaign-creation/CampaignScheduleStep";
@@ -44,10 +45,10 @@ export const CART_REMINDER_V1 = {
 };
 
 /** v2 of the cart reminder, after the marketer asks for a specific discount
- *  and more urgency. `{{disc_value}}` is the per-user personalisation tag. */
+ *  and more urgency. `{{user_att.disc_value}}` is the per-user personalisation tag. */
 export const CART_REMINDER_V2 = {
   title: "Abhi nahi toh kab? ⏰",
-  message: "Complete your purchase tonight and enjoy {{disc_value}} off!",
+  message: "Complete your purchase tonight & enjoy {{user_att.disc_value}} off!",
   media: "https://img.magnific.com/free-vector/halftone-style-comic-sale-background-yellow-white-color_1017-59305.jpg",
 };
 
@@ -234,6 +235,8 @@ export interface FlowQuestion {
   multi?: boolean;
   /** Can't be passed over — the Skip button is dropped. */
   required?: boolean;
+  /** Long lists show this many options and scroll for the rest. */
+  visibleOptions?: number;
   /** Label for this question's primary button when it is the last one. */
   confirmLabel?: string;
   /** Only asked when this passes (e.g. the promo-code question). */
@@ -446,6 +449,8 @@ export interface PushCampaignPrefill {
   templateId: number;
   /** `datetime-local`; omitted means the optimised send time. */
   sendAt?: string;
+  /** App ids the campaign goes out on; omitted means the default consumer apps. */
+  apps?: string[];
   /** What the preview screen lists beside the template. */
   details: {
     title: string;
@@ -459,8 +464,26 @@ export interface PushCampaignPrefill {
   };
 }
 
-export function prefillFrom(d: PushCartDraft): PushCampaignPrefill {
+/** Asked before the notification is written: which registered apps to include. */
+export const PUSH_APPS_QUESTION: FlowQuestion = {
+  id: "apps",
+  title: "Which apps would you like to include in this campaign?",
+  options: APP_OPTIONS.map((a) => a.name),
+  multi: true,
+  required: true,
+  visibleOptions: 4,
+  confirmLabel: "Continue",
+};
+
+/** The ids of the apps a multi-select answer names. */
+export function appIdsFor(answer: string | null | undefined): string[] {
+  const names = (answer ?? "").split("\n").map((x) => x.trim()).filter(Boolean);
+  return APP_OPTIONS.filter((a) => names.includes(a.name)).map((a) => a.id);
+}
+
+export function prefillFrom(d: PushCartDraft, apps?: string[]): PushCampaignPrefill {
   return {
+    apps: apps && apps.length > 0 ? apps : undefined,
     campaignName: campaignNameFor(d),
     conditions: conditionsFor(d),
     reach: reachFor(d),

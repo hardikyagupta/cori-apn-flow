@@ -41,6 +41,8 @@ import {
   QR_TYPE_QUESTION,
   QR_TYPE_YES,
   QR_THEME_QUESTION,
+  PUSH_APPS_QUESTION,
+  appIdsFor,
   themesFor,
   PUSH_CONTENT_CTA,
   CART_REMINDER_V2,
@@ -2381,7 +2383,7 @@ The content has been updated across all channels to reflect your changes.`;
   // The Questions card in flight — docked above the composer (not in the thread)
   // so it stays in line with the input, like the journey co-marketer's.
   const [dockedQuestions, setDockedQuestions] = useState<Extract<PushFlowCard, { kind: 'questions' }> | null>(null);
-  const pushFlowRef = useRef<{ active: boolean; one: FlowAnswers; two: FlowAnswers; draft: PushCartDraft | null; v2?: PushCartDraft | null }>({
+  const pushFlowRef = useRef<{ active: boolean; one: FlowAnswers; two: FlowAnswers; draft: PushCartDraft | null; v2?: PushCartDraft | null; apps?: string[] }>({
     active: false, one: {}, two: {}, draft: null,
   });
 
@@ -3043,7 +3045,22 @@ The content has been updated across all channels to reflect your changes.`;
       if (event.stage === 1) {
         flow.one = event.answers;
         flow.draft = draftFrom(flow.one, {});
+        // Before any copy is written, ask which apps the campaign covers.
+        playCoriReply(
+          {
+            content: 'Got it. Before I write the notification, I need to know where it will go.',
+            pushFlowCard: { kind: 'questions', stage: 'push-apps', questions: [PUSH_APPS_QUESTION] },
+          },
+          undefined,
+          2,
+          PUSH_LOADER_LABELS.questions,
+        );
+        return;
+      }
+      if (event.stage === 'push-apps') {
+        flow.apps = appIdsFor(event.answers.apps);
         const needsPromo = flow.one.promo === PROMO_YES;
+        if (!flow.draft) flow.draft = draftFrom(flow.one, {});
         if (flow.one.objective === DISCOUNT_OBJECTIVE) {
           // Discount path: a softer first draft, then the marketer's feedback
           // turns it into the current copy (flow.v2).
@@ -3119,7 +3136,7 @@ The content has been updated across all channels to reflect your changes.`;
       );
       return;
     }
-    onPreviewPushCampaign?.(prefillFrom(event.draft));
+    onPreviewPushCampaign?.(prefillFrom(event.draft, flow.apps));
   };
 
   // Deep-research narrative — a variant-agnostic story any co-marketer chat can

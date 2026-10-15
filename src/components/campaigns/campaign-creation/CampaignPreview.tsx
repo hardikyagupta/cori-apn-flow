@@ -175,7 +175,10 @@ export default function CampaignPreview({
 
   // The co-marketer's review of this campaign. Hidden while the chat is
   // docked; the thread is the same co-marketer.
-  const reviewAside = !chatOpen && (
+  // A campaign Cori built from start to finish has nothing to review, so the
+  // rail isn't shown at all.
+  const coriBuiltAll = isPush && Boolean(aiMade?.timing && aiMade?.audience && aiMade?.content);
+  const reviewAside = !chatOpen && !coriBuiltAll && (
           
           <aside className="flex w-[380px] shrink-0 flex-col gap-5">
             <div className="rounded-lg border border-[#DDE2EE] bg-white p-4">

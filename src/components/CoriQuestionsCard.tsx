@@ -56,6 +56,25 @@ export default function CoriQuestionsCard({
   const isLast = index >= total - 1 && index >= visible.length - 1;
   const picked = question ? answers[question.id] : undefined;
   const multiPicks = question.multi && picked ? picked.split("\n").filter(Boolean) : [];
+
+  // A long list shows `visibleOptions` rows and scrolls for the rest. The row
+  // height is measured, so the cut-off follows the real button size.
+  const listRef = useRef<HTMLDivElement>(null);
+  const [listMax, setListMax] = useState<number | null>(null);
+  useLayoutEffect(() => {
+    const list = listRef.current;
+    const n = question.visibleOptions;
+    if (!list || !n || question.options.length <= n) {
+      setListMax(null);
+      return;
+    }
+    const row = list.firstElementChild as HTMLElement | null;
+    if (!row) return;
+    const cs = getComputedStyle(list);
+    const gap = parseFloat(cs.rowGap) || 0;
+    // Top padding only, so the cut-off lands cleanly under the last visible row.
+    setListMax(row.offsetHeight * n + gap * (n - 1) + parseFloat(cs.paddingTop));
+  }, [question.id, question.visibleOptions, question.options.length]);
   const pickedOther = !question.multi && !!picked && !question.options.includes(picked);
 
   // Re-opening an earlier question shows what was typed in its Other row.
@@ -154,7 +173,13 @@ export default function CoriQuestionsCard({
               {question.title}
             </h3>
 
-            <div role={question.multi ? "group" : "radiogroup"} aria-label={question.title} className="flex flex-col gap-1.5 px-4 py-2.5">
+            <div
+              ref={listRef}
+              role={question.multi ? "group" : "radiogroup"}
+              aria-label={question.title}
+              className={cn("flex flex-col gap-1.5 px-4 py-2.5", listMax !== null && "scroll-slim overflow-y-auto")}
+              style={listMax !== null ? { maxHeight: listMax } : undefined}
+            >
               {question.options.map((opt) => {
                 const isSelected = question.multi ? multiPicks.includes(opt) : picked === opt;
                 return (

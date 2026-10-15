@@ -69,6 +69,9 @@ function NotificationPreview({ draft }: { draft: PushCartDraft }) {
   );
 }
 
+/** Parked for now — changes to the draft go through the chat instead. */
+const SHOW_DRAFT_EDITING = false;
+
 function ContentCard({
   draft: initial,
   needsPromo,
@@ -103,12 +106,16 @@ function ContentCard({
       </div>
       <div className="space-y-3 px-4 py-4">
         <NotificationPreview draft={draft} />
-        <Field label="Title">
-          <input className={fieldClass} value={draft.title} disabled={confirmed} onChange={(e) => set("title", e.target.value)} />
-        </Field>
-        <Field label="Body">
-          <textarea className={cn(fieldClass, "resize-none")} rows={2} value={draft.body} disabled={confirmed} onChange={(e) => set("body", e.target.value)} />
-        </Field>
+        {SHOW_DRAFT_EDITING && (
+          <>
+            <Field label="Title">
+              <input className={fieldClass} value={draft.title} disabled={confirmed} onChange={(e) => set("title", e.target.value)} />
+            </Field>
+            <Field label="Body">
+              <textarea className={cn(fieldClass, "resize-none")} rows={2} value={draft.body} disabled={confirmed} onChange={(e) => set("body", e.target.value)} />
+            </Field>
+          </>
+        )}
         {hasVariable && (
           <Field label="Discount value ({{disc_value}})">
             <input
@@ -131,16 +138,20 @@ function ContentCard({
             />
           </Field>
         )}
-        <div className="flex items-center justify-between gap-3">
-          <p className="font-manrope text-[13px] text-[#17173A]">Rich media · Shopping cart image</p>
-          <Switch checked={draft.richMedia} disabled={confirmed} onCheckedChange={(v) => set("richMedia", v)} />
-        </div>
-        <div className="flex items-center justify-between gap-3">
-          <p className="font-manrope text-[13px] text-[#17173A]">
-            Countdown timer <span className="text-[#6F6F8D]">· {COUNTDOWN_PREVIEW} (illustrative)</span>
-          </p>
-          <Switch checked={draft.countdown} disabled={confirmed} onCheckedChange={(v) => set("countdown", v)} />
-        </div>
+        {SHOW_DRAFT_EDITING && (
+          <>
+            <div className="flex items-center justify-between gap-3">
+              <p className="font-manrope text-[13px] text-[#17173A]">Rich media · Shopping cart image</p>
+              <Switch checked={draft.richMedia} disabled={confirmed} onCheckedChange={(v) => set("richMedia", v)} />
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <p className="font-manrope text-[13px] text-[#17173A]">
+                Countdown timer <span className="text-[#6F6F8D]">· {COUNTDOWN_PREVIEW} (illustrative)</span>
+              </p>
+              <Switch checked={draft.countdown} disabled={confirmed} onCheckedChange={(v) => set("countdown", v)} />
+            </div>
+          </>
+        )}
       </div>
       <div className="border-t border-[#E8ECF4] px-4 py-3">
         {superseded ? (
