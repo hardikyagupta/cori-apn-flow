@@ -9,6 +9,7 @@ import { reachFor, type AudienceValues } from "./CampaignAudienceStep";
 import { describeSlot, sliceSummaryLabel, type ScheduleValues } from "./CampaignScheduleStep";
 import type { ContentValues } from "./CampaignContentStep";
 import type { PushCampaignPrefill } from "@/data/pushCartFlow";
+import TemplatePushMock from "./TemplatePushMock";
 import { AndroidPreview, IosPreview, hasDraftContent, type RegularLayoutDraft } from "./PushRegularLayoutEditor";
 
 const nf = new Intl.NumberFormat("en-US");
@@ -337,6 +338,10 @@ export default function PushPreviewBody({
               alt={`${template.name} on ${os}`}
               className="mx-auto mt-4 max-h-[620px] w-auto"
             />
+          ) : template?.pushCard ? (
+            <div className="mt-4 flex justify-center">
+              <TemplatePushMock card={template.pushCard} os={os} view={layout} />
+            </div>
           ) : (
             <p className="py-12 text-center font-manrope text-sm text-[#6F6F8D]">
               No template selected yet — pick one on the Content step and it renders here.
