@@ -1602,6 +1602,15 @@ export default function CampaignCreationOverlay({
               plotAudienceDraft(card.audienceDraft);
             }
             setCoriMade((m) => ({ ...m, audience: card.audienceScope !== "exclusions" || m.audience }));
+            // Applied from the preview screen: take the marketer to the Audience
+            // step so they see the segment landed.
+            if (isPushChannel && previewOpen) {
+              const to = PUSH_STEPS.findIndex((st) => st.id === "audience");
+              setStepIndex(to);
+              setReachedIndex(PUSH_STEPS.length - 1);
+              setPreviewOpen(false);
+              canvasRef.current?.scrollTo({ top: 0 });
+            }
             return;
           }
           // App Push review: a change to the notification being drafted.
