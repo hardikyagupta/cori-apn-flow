@@ -1599,18 +1599,23 @@ export default function CampaignCreationOverlay({
                 excludeSegments: card.audienceDraft!.excludes.map((e) => ({ id: e.id, name: e.name, reach: e.reach, ai: true })),
               }));
             } else {
-              plotAudienceDraft(card.audienceDraft);
+              // A review finding lands as a saved segment in Segments/Lists,
+              // shown as the usual segment pill — not as ad-hoc conditions.
+              const d = card.audienceDraft;
+              setAudience((a) => ({
+                ...a,
+                mode: "segments",
+                segments: [{ id: `cori-${d.name}`, name: d.name, reach: d.reach, ai: true }],
+                excludeEnabled: d.excludes.length > 0 || a.excludeEnabled,
+                // The draft's reach is already net of its holdbacks, so they're
+                // listed without a count — otherwise reachFor would take them off
+                // a second time and the numbers wouldn't match the card.
+                excludeSegments: d.excludes.length
+                  ? d.excludes.map((e) => ({ id: e.id, name: e.name, reach: 0, ai: true }))
+                  : a.excludeSegments,
+              }));
             }
             setCoriMade((m) => ({ ...m, audience: card.audienceScope !== "exclusions" || m.audience }));
-            // Applied from the preview screen: take the marketer to the Audience
-            // step so they see the segment landed.
-            if (isPushChannel && previewOpen) {
-              const to = PUSH_STEPS.findIndex((st) => st.id === "audience");
-              setStepIndex(to);
-              setReachedIndex(PUSH_STEPS.length - 1);
-              setPreviewOpen(false);
-              canvasRef.current?.scrollTo({ top: 0 });
-            }
             return;
           }
           // App Push review: a change to the notification being drafted.
@@ -1712,7 +1717,7 @@ export default function CampaignCreationOverlay({
           card.audienceDraft
             ? card.audienceScope === "exclusions"
               ? audience.excludeEnabled && audience.excludeSegments.length > 0
-              : audience.mode === "adhoc" && audience.conditions.length === card.audienceDraft.conditions.length
+              : audience.mode === "segments" && audience.segments.some((sg) => sg.name === card.audienceDraft!.name)
             : card.pushDraftPatch
             ? isPushDraftPatchApplied(card.pushDraftPatch, pushDraft)
             : card.contentPatch
