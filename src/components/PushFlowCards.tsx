@@ -170,7 +170,7 @@ function ContentCard({
               onEvent({ type: "content", draft });
             }}
           >
-            Continue
+            Save &amp; continue
           </button>
         )}
       </div>
