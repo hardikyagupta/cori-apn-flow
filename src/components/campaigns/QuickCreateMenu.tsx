@@ -3,6 +3,7 @@ import iconJourney from "/campaign-assets/qc-journey.svg";
 import iconEmail from "/campaign-assets/qc-email.svg";
 import iconSms from "/campaign-assets/qc-sms.svg";
 import iconAppPush from "/campaign-assets/qc-app-push.svg";
+import iconAmp from "/campaign-assets/qc-amp.svg";
 import iconAppPushAb from "/campaign-assets/qc-app-push-ab.svg";
 import iconAppPushSplit from "/campaign-assets/qc-app-push-split.svg";
 import iconAppPushMulti from "/campaign-assets/qc-app-push-multi.svg";
@@ -73,6 +74,13 @@ const APP_PUSH_SUBMENU: SubmenuItem[] = [
   { label: "Multi message", disabled: true, icon: typeIcon(iconAppPushMulti) },
 ];
 
+const EMAIL_SUBMENU: SubmenuItem[] = [
+  { label: "Regular campaign", icon: <ItemIcon src={iconEmail} inset="9.74% 5.36%" /> },
+  { label: "AMP", disabled: true, icon: typeIcon(iconAmp) },
+  { label: "A/B campaign", disabled: true, icon: typeIcon(iconAppPushAb) },
+  { label: "Split campaign", disabled: true, icon: typeIcon(iconAppPushSplit) },
+];
+
 const SECTIONS: QuickCreateSection[] = [
   {
     items: [{ label: "Journey", icon: iconJourney, inset: "7.15% 7.14% 7.14% 10.72%" }],
@@ -80,7 +88,13 @@ const SECTIONS: QuickCreateSection[] = [
   {
     heading: "Create campaigns",
     items: [
-      { label: "Email", icon: iconEmail, inset: "9.74% 5.36%" },
+      {
+        label: "Email",
+        icon: iconEmail,
+        inset: "9.74% 5.36%",
+        hasSubmenu: true,
+        submenu: EMAIL_SUBMENU,
+      },
       { label: "SMS", icon: iconSms, inset: "5.57% 5.36% 5.73% 5.87%", disabled: true },
       {
         label: "App Push Notification",
