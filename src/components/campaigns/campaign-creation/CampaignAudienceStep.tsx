@@ -752,6 +752,8 @@ export default function CampaignAudienceStep({
           {values.mode !== "all" && <div className="mt-5 border-t border-[#EEF1F7] pt-5">{modeFields}</div>}
         </div>
 
+        {channel !== "Email" && (
+          <>
         <h2 className="mt-10 font-manrope text-base font-bold text-[#17173A]">Device targeting</h2>
         <p className="mt-1 font-manrope text-sm text-[#6F6F8D]">
           Choose whether each user receives the notification on their latest active device or on all of their
@@ -791,6 +793,8 @@ export default function CampaignAudienceStep({
             </button>
           ))}
         </div>
+          </>
+        )}
 
         <h2 className="mt-10 font-manrope text-base font-bold text-[#17173A]">Exclude contacts</h2>
         <div className="mt-4 rounded-lg border border-[#DDE2EE] px-6 py-5">

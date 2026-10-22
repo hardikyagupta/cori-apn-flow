@@ -24,7 +24,8 @@ export default function PushCampaignNavbar({
   icon: ComponentType<SVGProps<SVGSVGElement>>;
   isLastStep: boolean;
   onRenameCampaign: (name: string) => void;
-  onAskCoMarketer: () => void;
+  /** Omit to hide the Ask Cori button. */
+  onAskCoMarketer?: () => void;
   onNext: () => void;
   onClose: () => void;
 }) {
@@ -46,6 +47,7 @@ export default function PushCampaignNavbar({
       <div className="ml-auto flex items-center gap-3">
         {/* Ask Cori — the top-nav CTA verbatim: rotating conic-gradient ring
             (.snake-border), sparkle GIF, h-8 to match the buttons beside it. */}
+        {onAskCoMarketer && (
         <button
           type="button"
           onClick={onAskCoMarketer}
@@ -57,6 +59,7 @@ export default function PushCampaignNavbar({
             Ask Cori
           </span>
         </button>
+        )}
         <DsButton onClick={onNext}>{isLastStep ? "Preview" : "Next step"}</DsButton>
         <button
           type="button"

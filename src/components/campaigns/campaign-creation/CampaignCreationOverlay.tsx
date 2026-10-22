@@ -150,10 +150,19 @@ const CHANNEL_ICONS: Record<string, ChannelIconComponent> = {
 
 /** Channels that open on the prompt screen and can draft a whole campaign
  *  from a typed goal — every other channel goes straight to the wizard. */
-const hasAIFlow = (channel: string) => channel === "Email" || channel === "App Push Notification";
+const hasAIFlow = (channel: string) =>
+  (SHOW_EMAIL_CORI && channel === "Email") || channel === "App Push Notification";
+
+/** Cori on Email (prompt screen, Ask Cori, docked chat) is parked for now —
+ *  flip to true to bring it all back. */
+const SHOW_EMAIL_CORI = false;
 
 /** Temporarily hide Assets without removing its configuration or UI. */
 const SHOW_ASSETS_STEP = false;
+
+/** Email uses the same step-by-step stepper as App Push. Flip to false to bring
+ *  the accordion flow back — its code below is parked, not removed. */
+const EMAIL_STEPPER = true;
 
 /** App Push regular campaign's own step-by-step flow (see PushCampaignStepper):
  *  Setup holds the apps and tracking, Audience who it goes to. */
@@ -534,7 +543,9 @@ export default function CampaignCreationOverlay({
   const [settingsOpen, setSettingsOpen] = useState(false);
   // Docked co-marketer chat, opened from the navbar CTA. `chatSession` is
   // bumped per open so the widget remounts on a fresh thread.
-  const [chatOpen, setChatOpen] = useState(false);
+  const [chatOpenRaw, setChatOpen] = useState(false);
+  // Email has no Cori while SHOW_EMAIL_CORI is off, whatever tries to open it.
+  const chatOpen = chatOpenRaw && (SHOW_EMAIL_CORI || channel !== "Email");
   const [chatSession, setChatSession] = useState(0);
   // A notification Cori drafted on the Content step; `n` makes each one a new event.
   // The Regular layout notification written on the Content step (by hand or by Cori).
@@ -774,7 +785,10 @@ export default function CampaignCreationOverlay({
   // App Push: the docked Cori follows the stepper. Moving to another step starts
   // that step's own conversation (Content gets the template prompts) instead of
   // carrying the previous step's thread along.
-  const pushStepId = channel === "App Push Notification" ? PUSH_STEPS[stepIndex]?.id : undefined;
+  const pushStepId =
+    channel === "App Push Notification" || (EMAIL_STEPPER && channel === "Email")
+      ? PUSH_STEPS[stepIndex]?.id
+      : undefined;
   // App Push opens Cori by default: when the stepper first appears for a new
   // campaign, and again on every step after that. Each step starts its own
   // conversation (Content gets the template prompts) instead of carrying the
@@ -864,6 +878,8 @@ export default function CampaignCreationOverlay({
    * chat, so the wizard stays exactly where it is.
    */
   const isPushChannel = channel === "App Push Notification";
+  /** Channels drawn as the Setup → Audience → Content → Schedule stepper. */
+  const isStepper = isPushChannel || (EMAIL_STEPPER && channel === "Email");
   const audienceStarters = isPushChannel ? PUSH_AUDIENCE_STARTERS : SEGMENT_STARTERS;
   const audienceChips: StarterChip[] = audienceStarters.map((starter) => ({
     label: starter.title,
@@ -1163,7 +1179,7 @@ export default function CampaignCreationOverlay({
    *  then move on (or open the preview from the last step). */
   const goNextPushStep = () => {
     if (stepIndex === 0) {
-      if (audience.selectedApps.length === 0) {
+      if (isPushChannel && audience.selectedApps.length === 0) {
         setAppRequiredTried(true);
         setAppRequiredToast("Application is required.");
         return;
@@ -1491,7 +1507,7 @@ export default function CampaignCreationOverlay({
      either header. Rendered beside whichever screen is up. */
   // App Push drives its steps from the stepper, not the accordion rail, so the
   // chat's starter chips and greeting follow the step on screen.
-  const chatStepId = isPushChannel ? PUSH_STEPS[stepIndex].id : railStepId;
+  const chatStepId = isStepper ? PUSH_STEPS[stepIndex].id : railStepId;
   const chatColumn = chatOpen ? (
     <div className="flex h-full min-h-0 w-[474px] shrink-0 justify-end overflow-hidden py-3">
       <ChatInterface
@@ -1806,9 +1822,10 @@ export default function CampaignCreationOverlay({
           schedule={schedule}
           onBack={() => setPreviewOpen(false)}
           onPublish={prefill || isPushChannel ? () => setLaunching(true) : onClose}
+          setupEditStep={isStepper ? "setup" : undefined}
           publishLabel={prefill ? (prefill.sendAt ? "Schedule campaign" : "Launch campaign") : undefined}
           onEditStep={(stepId) => {
-            if (isPushChannel) {
+            if (isStepper) {
               // The stepper has its own Setup step; the preview's "Setup" card
               // (tracking) lives there too, the rest map one-to-one.
               const to = Math.max(0, PUSH_STEPS.findIndex((st) => st.id === (stepId === "schedule" ? "schedule" : stepId)));
@@ -1822,7 +1839,9 @@ export default function CampaignCreationOverlay({
             setPreviewOpen(false);
           }}
           // App Push: Cori reviews the campaign when asked, not by default.
-          onAskCoMarketer={isPushChannel ? handleAuditCampaign : openFreshChat}
+          onAskCoMarketer={
+            isPushChannel ? handleAuditCampaign : channel !== "Email" || SHOW_EMAIL_CORI ? openFreshChat : undefined
+          }
           onAskFinding={(finding) => openTopic(findingTopic(finding))}
           chatOpen={chatOpen}
           chatSlot={chatColumn}
@@ -1830,9 +1849,9 @@ export default function CampaignCreationOverlay({
           pushDetails={prefill?.details}
           customDraft={pushDraft}
           aiMade={pushAiMade}
-          onClose={isPushChannel ? onClose : undefined}
+          onClose={isStepper ? onClose : undefined}
         />
-      ) : isPushChannel ? (
+      ) : isStepper ? (
         <>
           <PushCampaignNavbar
             campaignName={campaignName}
@@ -1840,7 +1859,7 @@ export default function CampaignCreationOverlay({
             icon={Icon}
             isLastStep={stepIndex === PUSH_STEPS.length - 1}
             onRenameCampaign={renameCampaign}
-            onAskCoMarketer={openFreshChat}
+            onAskCoMarketer={isPushChannel || SHOW_EMAIL_CORI ? openFreshChat : undefined}
             onNext={goNextPushStep}
             onClose={onClose}
           />
@@ -1871,6 +1890,8 @@ export default function CampaignCreationOverlay({
                 // The old accordion rows for apps / tracking / conversion
                 // (CampaignAudienceStep part="setup") are parked for now.
                 <PushSetupStep
+                  showApps={isPushChannel}
+                  showControlGroup={isPushChannel}
                   campaignName={campaignName}
                   onRename={renameCampaign}
                   selectedApps={audience.selectedApps}
@@ -1916,7 +1937,19 @@ export default function CampaignCreationOverlay({
                   campaignName={campaignName}
                 />
               )}
-              {PUSH_STEPS[stepIndex].id === "content" && (
+              {PUSH_STEPS[stepIndex].id === "content" && !isPushChannel && (
+                <CampaignContentStep
+                  values={content}
+                  highlight={contentHighlight}
+                  onChange={(patch) => setContent((c) => ({ ...c, ...patch }))}
+                  reach={reachFor(audience)}
+                  aiGenerated={campaignAIGenerated}
+                  channel={channel}
+                  hasTargetApps={audience.selectedApps.length > 0}
+                  audienceMode={audience.mode}
+                />
+              )}
+              {PUSH_STEPS[stepIndex].id === "content" && isPushChannel && (
                 // The layout picker + template drawer. The earlier template grid
                 // with A/B test (CampaignContentStep) is parked for push.
                 <PushContentStep
