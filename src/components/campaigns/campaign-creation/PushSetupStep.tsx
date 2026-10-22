@@ -139,6 +139,8 @@ export default function PushSetupStep({
   controlGroupEnabled,
   onControlGroupChange,
   conversionEventError,
+  showApps = true,
+  showControlGroup = true,
 }: {
   campaignName: string;
   onRename: (name: string) => void;
@@ -150,6 +152,9 @@ export default function PushSetupStep({
   controlGroupEnabled: boolean;
   onControlGroupChange: (v: boolean) => void;
   conversionEventError?: string;
+  /** Email shares this step but has no target apps or control-group toggle. */
+  showApps?: boolean;
+  showControlGroup?: boolean;
 }) {
   const setUtm = (key: keyof UtmParameters, value: string) =>
     onSetupChange({
@@ -187,18 +192,20 @@ export default function PushSetupStep({
           </>
         )}
 
-        <div className={SHOW_NAME_FIELD ? "mt-6" : undefined}>
-          <MultiSelectDropdown
-            label="Select app(s)"
-            required
-            options={APP_OPTIONS}
-            value={selectedApps}
-            onChange={onAppsChange}
-            error={appsError}
-          />
-        </div>
+        {showApps && (
+          <div className={SHOW_NAME_FIELD ? "mt-6" : undefined}>
+            <MultiSelectDropdown
+              label="Select app(s)"
+              required
+              options={APP_OPTIONS}
+              value={selectedApps}
+              onChange={onAppsChange}
+              error={appsError}
+            />
+          </div>
+        )}
 
-        <div className="mt-6">
+        <div className={showApps || SHOW_NAME_FIELD ? "mt-6" : undefined}>
           <Label>Add tags</Label>
           <TagsField value={setup.tags} onChange={(tags) => onSetupChange({ tags })} />
         </div>
@@ -379,12 +386,14 @@ export default function PushSetupStep({
           </div>
         </ToggleCard>
 
-        <ToggleCard
-          title="Control group"
-          description="This campaign will not be shown to control group users"
-          checked={controlGroupEnabled}
-          onChange={onControlGroupChange}
-        />
+        {showControlGroup && (
+          <ToggleCard
+            title="Control group"
+            description="This campaign will not be shown to control group users"
+            checked={controlGroupEnabled}
+            onChange={onControlGroupChange}
+          />
+        )}
       </div>
     </div>
   );

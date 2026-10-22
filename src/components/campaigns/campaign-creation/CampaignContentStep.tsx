@@ -18,6 +18,7 @@ import {
   FolderInput,
   Info,
   LayoutGrid,
+  List as ListIcon,
   Mail,
   Monitor,
   Moon,
@@ -231,7 +232,7 @@ const ATTACHMENT_ACCEPT = ".csv,.xls,.xlsx,.htm,.html,.pdf,.docx,.jpg,.jpeg,.gif
  * then Subject/Pre-header) — the old sender-fields block stays in place below,
  * just not rendered, so flipping this back to false brings it right back.
  */
-const CONTENT_LAYOUT_V2 = true;
+const CONTENT_LAYOUT_V2 = false;
 
 const PER_PAGE_OPTIONS = [5, 10, 50, 100, 150];
 /** Only these page sizes are wired up; the rest are shown but not selectable. */
@@ -267,15 +268,19 @@ const APP_PUSH_LAYOUTS: { id: string; label: string }[] = [
   { id: "product-set", label: "Product set" },
 ];
 
-type TemplateSourceTab = "library" | "saved";
+type TemplateSourceTab = "library" | "saved" | "folders";
 
 const TEMPLATE_SOURCE_TABS: { id: TemplateSourceTab; label: string }[] = [
-  { id: "library", label: "Template library" },
+  { id: "library", label: "Template gallery" },
   { id: "saved", label: "Saved templates" },
+  { id: "folders", label: "Folders" },
 ];
 
 /** Folders collapse to one row until "View more" is tapped. */
 const FOLDERS_COLLAPSED_COUNT = 3;
+
+/** Parked for now: show every folder upfront, without the "View more" toggle. */
+const COLLAPSE_FOLDERS = false;
 
 const fieldClass =
   "h-10 w-full rounded-md border border-[#DDE2EE] bg-[#F7F9FC] px-3 font-manrope text-sm text-[#17173A] outline-none transition-colors placeholder:text-[#A0A0A0] focus:border-[#2F68E5] focus:bg-white";
@@ -310,9 +315,12 @@ function MiniSwitch({
 function CreateNewMenu({
   onPick,
   channel = "Email",
+  tile = false,
 }: {
   onPick: (starterId: string) => void;
   channel?: string;
+  /** Email's Content section shows "Create a new" as a single HTML tile. */
+  tile?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [hovered, setHovered] = useState<"html" | "amp" | null>(null);
@@ -355,23 +363,46 @@ function CreateNewMenu({
 
   return (
     <div ref={wrapRef} className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className="dc-btn dc-btn-secondary"
-      >
-        <Plus className="size-4" strokeWidth={2.4} />
-        Create new
-      </button>
+      {tile ? (
+        <button
+          type="button"
+          aria-label="Create a new HTML template"
+          onClick={() => setOpen((o) => !o)}
+          className="block rounded-[5px] transition-opacity hover:opacity-90"
+        >
+          <img src="/campaign-assets/email/html-icon.svg" alt="" className="h-[144px] w-[149px]" />
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          className="dc-btn dc-btn-secondary"
+        >
+          <Plus className="size-4" strokeWidth={2.4} />
+          Create new
+        </button>
+      )}
       {open &&
         rect &&
         createPortal(
           <div
             ref={panelRef}
-            style={{ position: "fixed", top: rect.bottom + 4, left: rect.right - 190, width: 190 }}
+            style={{ position: "fixed", top: rect.bottom + 4, left: tile ? rect.left : rect.right - 190, width: 190 }}
             className="scroll-slim z-[80] max-h-[280px] overflow-y-auto rounded-md border border-[#DDE2EE] bg-white py-1 shadow-[0_8px_24px_rgba(23,23,58,0.12)]"
           >
-            {channel === "Email"
+            {tile
+              ? EDITOR_OPTIONS.map((o) => (
+                  <button
+                    key={o.id}
+                    type="button"
+                    onClick={() => pick(o.id)}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left font-manrope text-sm text-[#17173A] transition-colors hover:bg-[#F7F9FC]"
+                  >
+                    <o.icon className="size-4 text-[#6F6F8D]" strokeWidth={2} />
+                    {o.label}
+                  </button>
+                ))
+              : channel === "Email"
               ? EMAIL_FORMATS.map((fmt) => (
                   <div
                     key={fmt.id}
@@ -537,6 +568,7 @@ function TemplatePreviewPanel({
   defaultSubject,
   defaultSenderName,
   defaultDomain,
+  testListMode = false,
 }: {
   template: EmailTemplate | null;
   channel: string;
@@ -553,6 +585,8 @@ function TemplatePreviewPanel({
   defaultSubject: string;
   defaultSenderName: string;
   defaultDomain: string;
+  /** The audience is a user data table: tests go to an uploaded list. */
+  testListMode?: boolean;
 }) {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [sendTestOpen, setSendTestOpen] = useState(false);
@@ -563,6 +597,114 @@ function TemplatePreviewPanel({
   const resolvedImage = isPush
     ? template?.pushPreviews?.[pushPreviewKey] ?? template?.image
     : template?.image;
+
+  // Email's chosen-template state follows the Content-section revamp: an "Email
+  // body" header with Send test, then one panel — change/edit, device toggle and
+  // view options on a toolbar, the template's name and ID, then the template.
+  if (!isPush) {
+    return (
+      <div className="mt-8">
+        <div className="mb-4 flex items-start justify-between gap-4">
+          <div>
+            <h2 className="font-manrope text-[20px] font-bold leading-7 text-[#222B45]">Email body</h2>
+            <p className="font-manrope text-sm font-semibold text-[#6F6F8D]">
+              Personalized content leads to better engagement.
+            </p>
+          </div>
+          <button type="button" onClick={() => setSendTestOpen(true)} className="dc-btn dc-btn-secondary">
+            <FlaskConical className="size-4" strokeWidth={2} />
+            Send test
+          </button>
+        </div>
+
+        <div className="overflow-hidden rounded-lg border border-[#DDE2EE] bg-white">
+          <div className="flex items-center justify-between gap-4 border-b border-[#DDE2EE] px-6 py-3">
+            <div className="flex items-center gap-4">
+              <button type="button" onClick={onChangeTemplate} className="dc-btn dc-btn-secondary">
+                <Replace className="size-4" strokeWidth={2} />
+                Change template
+              </button>
+              <button type="button" className="dc-btn dc-btn-secondary">
+                <Pencil className="size-4" strokeWidth={2} />
+                Edit template
+              </button>
+            </div>
+
+            <div className="flex overflow-hidden rounded border border-[#DDE2EE]">
+              {(
+                [
+                  { id: "desktop", label: "Desktop preview", Icon: Monitor },
+                  { id: "mobile", label: "Mobile preview", Icon: Smartphone },
+                ] as const
+              ).map(({ id, label, Icon }) => (
+                <button
+                  key={id}
+                  type="button"
+                  aria-label={label}
+                  aria-pressed={device === id}
+                  onClick={() => onDeviceChange(id)}
+                  className={cn(
+                    "grid h-8 w-[34px] place-items-center transition-colors",
+                    device === id
+                      ? "bg-[var(--btn-primary)] text-white"
+                      : "bg-white text-[#8A8AA3] hover:text-[#17173A]"
+                  )}
+                >
+                  <Icon className="size-4" strokeWidth={2} />
+                </button>
+              ))}
+            </div>
+
+            <div className="flex items-center gap-6">
+              {["Browser view", "Mobile view"].map((label) => (
+                <label key={label} className="flex cursor-pointer items-center gap-2 font-manrope text-sm text-[#6F6F8D]">
+                  <input type="checkbox" className="size-4 rounded border-[#DDE2EE] accent-[var(--btn-primary)]" />
+                  {label}
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div className="px-6 py-4">
+            <p className="font-manrope text-sm text-[#17173A]">
+              Template name: <span className="font-bold">{template?.name ?? "—"}</span>
+            </p>
+            <p className="font-manrope text-sm text-[#17173A]">
+              Template ID: <span className="font-bold">{template?.id ?? "—"}</span>
+            </p>
+          </div>
+
+          <div className="flex justify-center px-6 pb-8">
+            <div
+              className={cn(
+                "max-h-[640px] overflow-y-auto transition-all duration-300 ease-in-out",
+                device === "mobile" ? "w-[380px] rounded-lg border border-[#DDE2EE]" : "w-full"
+              )}
+            >
+              {!template ? (
+                <div className="grid h-40 place-items-center font-manrope text-sm text-[#6F6F8D]">
+                  Template not found.
+                </div>
+              ) : template.image ? (
+                <img src={template.image} alt="" className="block h-auto w-full" />
+              ) : (
+                <TemplateThumbnail kind={template.preview} />
+              )}
+            </div>
+          </div>
+        </div>
+
+        <SendTestMailDrawer
+          open={sendTestOpen}
+          onClose={() => setSendTestOpen(false)}
+          defaultSubject={defaultSubject}
+          defaultSenderName={defaultSenderName}
+          defaultDomain={defaultDomain}
+          testListMode={testListMode}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="mt-10">
@@ -788,6 +930,7 @@ function TemplatePreviewPanel({
           defaultSubject={defaultSubject}
           defaultSenderName={defaultSenderName}
           defaultDomain={defaultDomain}
+          testListMode={testListMode}
         />
       )}
     </div>
@@ -1139,13 +1282,13 @@ function AddButton({
       type="button"
       onClick={onClick}
       className={cn(
-        "inline-flex h-9 items-center gap-1.5 rounded-md border px-3 font-manrope text-[12px] font-bold uppercase tracking-[0.4px] transition-colors",
+        "inline-flex h-8 items-center justify-center gap-1 rounded-[4px] border px-3.5 font-manrope text-sm font-semibold uppercase tracking-[0.42px] transition-colors",
         active
           ? "border-[#2F68E5] bg-[#F4F8FF] text-[#2F68E5]"
-          : "border-[#DDE2EE] bg-white text-[#17173A] hover:bg-[#F7F9FC]"
+          : "border-[#DDE2EE] bg-white text-[#6F6F8D] hover:bg-[#F7F9FC] hover:text-[#17173A]"
       )}
     >
-      <Icon className="size-4" strokeWidth={2.4} />
+      <Icon className="size-3.5" strokeWidth={2.4} />
       {label}
     </button>
   );
@@ -1621,6 +1764,7 @@ export default function CampaignContentStep({
   aiGenerated = false,
   channel = "Email",
   hasTargetApps = true,
+  audienceMode,
 }: {
   values: ContentValues;
   onChange: (patch: Partial<ContentValues>) => void;
@@ -1637,6 +1781,8 @@ export default function CampaignContentStep({
   /** Whether the Send to step's "Target app(s)" field has a selection yet —
    *  push channels can't use or create a template until it does. */
   hasTargetApps?: boolean;
+  /** Audience selection mode — "table" switches Send test to an uploaded list. */
+  audienceMode?: string;
 }) {
   const [query, setQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
@@ -2171,53 +2317,49 @@ export default function CampaignContentStep({
         </>
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-x-6 gap-y-6">
+          {/* Sender details, laid out as the Content-section revamp: name, email
+              and domain share a row; subject and pre-header sit below at 620px. */}
+          <div className="grid max-w-[1120px] grid-cols-3 gap-x-3.5 gap-y-5">
             <Field label="Sender name" info="Shown as the from-name in the inbox.">
               <input
                 type="text"
                 value={values.senderName}
                 onChange={(e) => onChange({ senderName: e.target.value })}
-                placeholder="Sender name"
+                placeholder="Enter your sender name"
                 className={cn(fieldClass, highlight?.senderName && "cmk-field-flash")}
               />
             </Field>
 
-            <Field label="Sender email" required>
-              <div
-                className={cn(
-                  "flex h-10 w-full items-stretch overflow-hidden rounded-md border border-[#DDE2EE] bg-[#F7F9FC] transition-colors focus-within:border-[#2F68E5] focus-within:bg-white",
-                  highlight?.senderEmail && "cmk-field-flash"
-                )}
-              >
-                <input
-                  type="text"
-                  value={values.senderEmail}
-                  onChange={(e) => onChange({ senderEmail: e.target.value })}
-                  placeholder="noreply"
-                  className="min-w-0 flex-1 bg-transparent px-3 font-manrope text-sm text-[#17173A] outline-none placeholder:text-[#A0A0A0]"
-                />
-                <span className="flex items-center font-manrope text-sm text-[#6F6F8D]">@</span>
-                <div className="relative flex items-center">
-                  <select
-                    value={values.domain}
-                    onChange={(e) => onChange({ domain: e.target.value })}
-                    className="h-full appearance-none bg-transparent pl-1.5 pr-8 font-manrope text-sm font-semibold text-[#17173A] outline-none"
-                  >
-                    {DOMAINS.map((d) => (
-                      <option key={d}>{d}</option>
-                    ))}
-                  </select>
-                  <ChevronDown
-                    className="pointer-events-none absolute right-3 size-4 text-[#8A8AA3]"
-                    strokeWidth={2}
-                  />
-                </div>
-              </div>
-              <p className="mt-1.5 font-manrope text-xs text-[#6F6F8D]">
-                Only verified domains appear here.
-              </p>
+            <Field label="Sender email" required info="The address this campaign is sent from.">
+              <input
+                type="text"
+                value={values.senderEmail}
+                onChange={(e) => onChange({ senderEmail: e.target.value })}
+                placeholder="Enter sender's email address"
+                className={cn(fieldClass, highlight?.senderEmail && "cmk-field-flash")}
+              />
             </Field>
 
+            <Field label="Domain" required>
+              <div className="relative">
+                <select
+                  value={values.domain}
+                  onChange={(e) => onChange({ domain: e.target.value })}
+                  className={cn(fieldClass, "appearance-none pr-10")}
+                >
+                  {DOMAINS.map((d) => (
+                    <option key={d}>{d}</option>
+                  ))}
+                </select>
+                <ChevronDown
+                  className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-[#8A8AA3]"
+                  strokeWidth={2}
+                />
+              </div>
+            </Field>
+          </div>
+
+          <div className="mt-5 grid max-w-[620px] gap-y-5">
             <Field
               label="Subject"
               required
@@ -2227,7 +2369,7 @@ export default function CampaignContentStep({
                 type="text"
                 value={values.subject}
                 onChange={(e) => onChange({ subject: e.target.value })}
-                placeholder="Subject line"
+                placeholder="Ex: Get an extra 20% off your next purchase"
                 className={cn(fieldClass, highlight?.subject && "cmk-field-flash")}
               />
             </Field>
@@ -2237,13 +2379,13 @@ export default function CampaignContentStep({
                 type="text"
                 value={values.preHeader}
                 onChange={(e) => onChange({ preHeader: e.target.value })}
-                placeholder="Pre-header"
+                placeholder="Ex: Exclusive offer just for you!"
                 className={cn(fieldClass, highlight?.preHeader && "cmk-field-flash")}
               />
             </Field>
           </div>
 
-          <div className="mt-7 flex flex-wrap gap-3">
+          <div className="mt-6 flex flex-wrap gap-6">
             <AddButton
               label="Reply email id"
               active={values.replyEnabled}
@@ -2325,17 +2467,15 @@ export default function CampaignContentStep({
           defaultSubject={values.subject}
           defaultSenderName={values.senderName}
           defaultDomain={values.domain}
+          testListMode={audienceMode === "table"}
         />
       ) : (
         <>
       {/* Template picker — same panel, its own heading, exactly as sender
           details and the template list sit together in the reference. */}
-      <div className="mb-4 mt-10 flex items-center justify-between gap-4">
-        <h2 className="font-manrope text-base font-bold text-[#17173A]">
-          {channel === "Email" ? "Select a template" : "Select a template or create new"}
-        </h2>
-
-        <div className="flex items-center gap-2">
+      {(() => {
+        const searchControl = (
+          <>
           {searchOpen ? (
             <div className="relative">
               <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[#8A8AA3]" />
@@ -2375,46 +2515,117 @@ export default function CampaignContentStep({
               <Search className="size-4" strokeWidth={2} />
             </button>
           )}
-          <button type="button" className="dc-btn dc-btn-secondary">
-            <SlidersHorizontal className="size-4" strokeWidth={2} />
-            Filters
-          </button>
-          <CreateNewMenu
-            channel={channel}
-            onPick={(starterId) => {
-              if (requireTargetApp("create")) return;
-              onChange({ starterId, templateId: null });
-              if (starterId === "carousel-e2e") setCarouselEditorOpen(true);
-            }}
-          />
-        </div>
-      </div>
+          </>
+        );
+        return (
+          <>
+            <div className="mb-4 mt-10 flex items-center justify-between gap-4">
+              <h2 className="font-manrope text-base font-bold text-[#17173A]">
+                {channel === "Email" ? "Select template or create new" : "Select a template or create new"}
+              </h2>
+              {channel !== "Email" && (
+                <div className="flex items-center gap-2">
+                  {searchControl}
+                  <button type="button" className="dc-btn dc-btn-secondary">
+                    <SlidersHorizontal className="size-4" strokeWidth={2} />
+                    Filters
+                  </button>
+                  <CreateNewMenu
+                    channel={channel}
+                    onPick={(starterId) => {
+                      if (requireTargetApp("create")) return;
+                      onChange({ starterId, templateId: null });
+                      if (starterId === "carousel-e2e") setCarouselEditorOpen(true);
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+
+            {channel === "Email" && (
+              <div className="mb-6">
+                <h3 className="mb-3 font-manrope text-base font-bold text-[#17173A]">Create a new</h3>
+                <CreateNewMenu
+                  tile
+                  channel={channel}
+                  onPick={(starterId) => {
+                    onChange({ starterId, templateId: null });
+                    if (starterId === "carousel-e2e") setCarouselEditorOpen(true);
+                  }}
+                />
+              </div>
+            )}
+
+            {channel === "Email" && (
+              <div className="mb-3 flex items-start justify-between gap-4">
+                <div className="flex items-center gap-6">
+                  {TEMPLATE_SOURCE_TABS.map((t) => {
+                    const count =
+                      t.id === "library"
+                        ? templateLibrary.length
+                        : t.id === "saved"
+                          ? emailTemplates.length
+                          : savedTemplateFolders.length;
+                    return (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => setSourceTab(t.id)}
+                        className={cn(
+                          "relative pb-2.5 font-manrope text-sm transition-colors",
+                          sourceTab === t.id
+                            ? "font-bold text-[var(--btn-primary)]"
+                            : "font-medium text-[#6F6F8D] hover:text-[#17173A]"
+                        )}
+                      >
+                        {t.label} ({String(count).padStart(2, "0")})
+                        {sourceTab === t.id && (
+                          <span className="absolute -bottom-px left-0 h-[3px] w-full rounded-[1.5px] bg-[var(--btn-primary)]" />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="flex items-center gap-2 pb-2">
+                  {searchControl}
+                  <button
+                    type="button"
+                    aria-label="List view"
+                    className="grid size-8 place-items-center rounded border border-[#DDE2EE] bg-white text-[#6F6F8D] transition-colors hover:bg-[#F7F9FC] hover:text-[#17173A]"
+                  >
+                    <ListIcon className="size-4" strokeWidth={2} />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="Filters"
+                    className="grid size-8 place-items-center rounded border border-[#DDE2EE] bg-white text-[#6F6F8D] transition-colors hover:bg-[#F7F9FC] hover:text-[#17173A]"
+                  >
+                    <SlidersHorizontal className="size-4" strokeWidth={2} />
+                  </button>
+                </div>
+              </div>
+            )}
+            {channel === "Email" && (
+              <p className="mb-5 font-manrope text-sm text-[#6F6F8D]">
+                Note: Only templates that can be used in email campaigns are shown.{" "}
+                <a
+                  href="https://cedocs.netcorecloud.com/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[#0A8FFD] hover:underline"
+                >
+                  Learn more
+                </a>
+              </p>
+            )}
+          </>
+        );
+      })()}
 
       {channel === "Email" ? (
         <>
-          <div className="mb-6 flex items-center gap-6 border-b border-[#E8ECF4]">
-            {TEMPLATE_SOURCE_TABS.map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => setSourceTab(t.id)}
-                className={cn(
-                  "relative pb-2.5 font-manrope text-sm transition-colors",
-                  sourceTab === t.id
-                    ? "font-bold text-[#2F68E5]"
-                    : "font-medium text-[#6F6F8D] hover:text-[#17173A]"
-                )}
-              >
-                {t.label}
-                {sourceTab === t.id && (
-                  <span className="absolute -bottom-px left-0 h-[3px] w-full rounded-[1.5px] bg-[#2F68E5]" />
-                )}
-              </button>
-            ))}
-          </div>
-
           {sourceTab === "library" ? (
-            <div className="grid grid-cols-5 gap-4">
+            <div className="grid grid-cols-6 gap-6">
               {templateLibrary.map((t) => (
                 <TemplateCard
                   key={t.id}
@@ -2426,19 +2637,18 @@ export default function CampaignContentStep({
                 />
               ))}
             </div>
-          ) : (
+          ) : sourceTab === "folders" ? (
             <>
-              <div className="mb-8">
-                <h3 className="mb-4 font-manrope text-sm font-bold text-[#17173A]">Folders</h3>
+              <div>
                 <div className="grid grid-cols-3 gap-4">
-                  {(foldersExpanded
+                  {(foldersExpanded || !COLLAPSE_FOLDERS
                     ? savedTemplateFolders
                     : savedTemplateFolders.slice(0, FOLDERS_COLLAPSED_COUNT)
                   ).map((f) => (
                     <FolderCard key={f.id} folder={f} />
                   ))}
                 </div>
-                {savedTemplateFolders.length > FOLDERS_COLLAPSED_COUNT && (
+                {COLLAPSE_FOLDERS && savedTemplateFolders.length > FOLDERS_COLLAPSED_COUNT && (
                   <button
                     type="button"
                     onClick={() => setFoldersExpanded((o) => !o)}
@@ -2452,17 +2662,15 @@ export default function CampaignContentStep({
                   </button>
                 )}
               </div>
-
-              <h3 className="mb-4 font-manrope text-sm font-bold text-[#17173A]">
-                Unorganized templates
-              </h3>
-
+            </>
+          ) : (
+            <>
               {shown.length === 0 ? (
                 <p className="py-16 text-center font-manrope text-sm text-[#6F6F8D]">
                   No template matches “{query}”.
                 </p>
               ) : (
-                <div className="grid grid-cols-5 gap-4">
+                <div className="grid grid-cols-6 gap-6">
                   {shown.map((t) => (
                     <TemplateCard
                       key={t.id}

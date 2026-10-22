@@ -106,6 +106,7 @@ export default function CampaignPreview({
   customDraft,
   aiMade,
   onClose,
+  setupEditStep,
 }: {
   campaignId: string;
   campaignName: string;
@@ -120,7 +121,8 @@ export default function CampaignPreview({
   /** Jump back into the wizard at this step. */
   onEditStep: (stepId: string) => void;
   /** Opens a fresh co-marketer thread from the header CTA. */
-  onAskCoMarketer: () => void;
+  /** Omit to hide the Ask Cori button. */
+  onAskCoMarketer?: () => void;
   /** Opens the co-marketer already answering about one finding. */
   onAskFinding: (finding: Finding) => void;
   /** While the chat is docked the review rail stands down — same rule as the
@@ -136,6 +138,8 @@ export default function CampaignPreview({
   aiMade?: { timing?: boolean; audience?: boolean; content?: boolean };
   /** App Push: leave the wizard altogether (back to the campaigns list). */
   onClose?: () => void;
+  /** Which step the Setup card's EDIT opens — the stepper has its own Setup. */
+  setupEditStep?: string;
 }) {
   const [previewEmail, setPreviewEmail] = useState("");
   const [refreshing, setRefreshing] = useState(false);
@@ -221,7 +225,7 @@ export default function CampaignPreview({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <header className="flex h-14 shrink-0 items-center gap-3 border-b border-[#DDE2EE] bg-white px-14">
-        {!(isPush && onClose) && (
+        {!(onClose) && (
           <button
             type="button"
             onClick={onBack}
@@ -234,6 +238,7 @@ export default function CampaignPreview({
         <h1 className="truncate font-manrope text-base font-bold text-[#17173A]">
           Preview of {name}
         </h1>
+        {onAskCoMarketer ? (
         <button
           type="button"
           onClick={onAskCoMarketer}
@@ -245,6 +250,9 @@ export default function CampaignPreview({
             {isPush ? "Audit the campaign with Cori" : "Ask Cori"}
           </span>
         </button>
+        ) : (
+          <span className="ml-auto" />
+        )}
         <button
           type="button"
           onClick={onPublish}
@@ -252,7 +260,7 @@ export default function CampaignPreview({
         >
           {publishLabel}
         </button>
-        {isPush && onClose && (
+        {onClose && (
           <button
             type="button"
             onClick={onClose}
@@ -287,7 +295,7 @@ export default function CampaignPreview({
           <div className="flex items-start gap-5">
           {/* Left column — setup and audience */}
           <div className="flex w-[34%] shrink-0 flex-col gap-5">
-            <PreviewCard icon={Settings} title="Setup" onEdit={() => onEditStep(isPush ? "setup" : "schedule")}>
+            <PreviewCard icon={Settings} title="Setup" onEdit={() => onEditStep(setupEditStep ?? (isPush ? "setup" : "schedule"))}>
               <SubHeading>Campaign details</SubHeading>
               <Row label="Campaign ID:">{campaignId}</Row>
               <Row label="Campaign name:">{name}</Row>
