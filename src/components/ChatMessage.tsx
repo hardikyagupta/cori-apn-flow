@@ -529,7 +529,7 @@ interface ChatMessageProps {
   isExpanded?: boolean;
   insightCard?: InsightCardContext;
   questionRecap?: QuestionRecapEntry[];
-  /** Cori's App Push cart flow — a Questions / draft / brief card under the text. */
+  /** Zeno's App Push cart flow — a Questions / draft / brief card under the text. */
   pushFlowCard?: PushFlowCard;
   onPushFlowEvent?: (event: PushFlowEvent) => void;
 }

@@ -123,7 +123,7 @@ export default function CampaignPreview({
   /** Jump back into the wizard at this step. */
   onEditStep: (stepId: string) => void;
   /** Opens a fresh co-marketer thread from the header CTA. */
-  /** Omit to hide the Ask Cori button. */
+  /** Omit to hide the Ask Zeno button. */
   onAskCoMarketer?: () => void;
   /** Opens the co-marketer already answering about one finding. */
   onAskFinding: (finding: Finding) => void;
@@ -132,11 +132,11 @@ export default function CampaignPreview({
   chatOpen: boolean;
   chatSlot?: ReactNode;
   channel?: string;
-  /** What Cori drafted for an App Push campaign — listed beside the template. */
+  /** What Zeno drafted for an App Push campaign — listed beside the template. */
   pushDetails?: PushCampaignPrefill["details"];
   /** App Push: the Regular layout notification written on the Content step. */
   customDraft?: RegularLayoutDraft;
-  /** App Push: parts Cori built, which the review leaves alone. */
+  /** App Push: parts Zeno built, which the review leaves alone. */
   aiMade?: { timing?: boolean; audience?: boolean; content?: boolean };
   /** App Push: leave the wizard altogether (back to the campaigns list). */
   onClose?: () => void;
@@ -188,10 +188,10 @@ export default function CampaignPreview({
 
   // The co-marketer's review of this campaign. Hidden while the chat is
   // docked; the thread is the same co-marketer.
-  // A campaign Cori built from start to finish has nothing to review, so the
+  // A campaign Zeno built from start to finish has nothing to review, so the
   // rail isn't shown at all.
   const coriBuiltAll = isPush && Boolean(aiMade?.timing && aiMade?.audience && aiMade?.content);
-  // App Push never shows the rail by default: Ask Cori runs the review in the chat.
+  // App Push never shows the rail by default: Ask Zeno runs the review in the chat.
   const reviewAside = !chatOpen && !isPush && !coriBuiltAll && (
           
           <aside className="flex w-[380px] shrink-0 flex-col gap-5">
@@ -199,7 +199,7 @@ export default function CampaignPreview({
               <div className="flex items-center gap-2">
                 <img src={sparkle} alt="" className="size-5 shrink-0" />
                 <h2 className="font-manrope text-base font-bold text-[#17173A]">
-                  Cori review
+                  Zeno review
                 </h2>
               </div>
               <p className="mt-1 font-manrope text-xs leading-[18px] text-[#6F6F8D]">
@@ -256,7 +256,7 @@ export default function CampaignPreview({
               <span aria-hidden="true" className="snake-border" />
               <img src={navSparkle} alt="" className="relative z-[1] h-5 w-5" />
               <span className="relative z-[1] font-manrope text-xs font-semibold tracking-[0.42px] text-ash">
-                {isPush ? "Audit the campaign with Cori" : "Ask Cori"}
+                {isPush ? "Audit the campaign with Zeno" : "Ask Zeno"}
               </span>
             </button>
             {isPush && !chatOpen && nudgeOpen && (
@@ -293,7 +293,7 @@ export default function CampaignPreview({
                       Give your campaign a quick check ✅
                     </span>
                     <p className="font-manrope text-[13px] font-medium leading-[20px] text-[#6F6F8D]">
-                      Let Cori review your campaign for potential issues and suggest improvements before you publish.
+                      Let Zeno review your campaign for potential issues and suggest improvements before you publish.
                     </p>
                   </div>
 

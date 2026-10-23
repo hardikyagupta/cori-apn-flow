@@ -52,7 +52,7 @@ export default function SegmentCreationNavbar({
           <span aria-hidden="true" className="snake-border" />
           <img src={sparkle} alt="" className="relative z-[1] h-5 w-5" />
           <span className="relative z-[1] font-manrope text-xs font-semibold tracking-[0.42px] text-ash">
-            Ask Cori
+            Ask Zeno
           </span>
         </button>
         <button

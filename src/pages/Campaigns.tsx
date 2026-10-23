@@ -73,8 +73,8 @@ export default function Campaigns() {
   const [campaignRows, setCampaignRows] = useState<Campaign[]>(initialCampaigns);
   // One-shot confetti layer over the whole page — mounted only while it plays.
   const [confettiActive, setConfettiActive] = useState(false);
-  // "Preview campaign" on Cori's App Push brief — opens the creation wizard on
-  // its preview screen with the campaign Cori drafted in chat.
+  // "Preview campaign" on Zeno's App Push brief — opens the creation wizard on
+  // its preview screen with the campaign Zeno drafted in chat.
   const [pushPrefill, setPushPrefill] = useState<PushCampaignPrefill | null>(null);
   const [pushPreviewOpen, setPushPreviewOpen] = useState(false);
   const { toast } = useToast();

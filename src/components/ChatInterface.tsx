@@ -253,7 +253,7 @@ export interface ChatMessageData {
   // bold question + plain answer per row — instead of a single joined
   // string, once a question (or short batch) has just been answered.
   questionRecap?: QuestionRecapEntry[];
-  // Cori's App Push cart flow — a Questions / notification draft / brief card
+  // Zeno's App Push cart flow — a Questions / notification draft / brief card
   // attached under this message's text (see startPushCartFlow).
   pushFlowCard?: PushFlowCard;
   // The goal-first conversation's "merge the test journey into main" CTA —
@@ -371,17 +371,17 @@ interface ChatInterfaceProps {
   /** See ChatMessage's own doc — forwarded straight through to every
    *  message's audience-test question card. */
   onRespondAudienceTest?: (percent: number) => void;
-  /** The wizard hosting this chat can have Cori build its audience in
+  /** The wizard hosting this chat can have Zeno build its audience in
    *  conversation (see audienceAgentFlow). Without it, that prompt is just a
    *  prompt. */
   audienceAgent?: AudienceAgentHost;
-  /** On the wizard's Content step: lets Cori draft the notification into the editor. */
+  /** On the wizard's Content step: lets Zeno draft the notification into the editor. */
   contentAgent?: ContentAgentHost;
   /** A question card the host wants answered before anything is generated —
    *  drawn above the composer, and the empty state stands down while it's up
    *  (e.g. the Segment agent asking what the campaign is for). */
   approvalCard?: React.ReactNode;
-  /** "Preview campaign" on Cori's App Push brief — the host opens the creation
+  /** "Preview campaign" on Zeno's App Push brief — the host opens the creation
    *  wizard on its preview screen with this draft. */
   onPreviewPushCampaign?: (prefill: PushCampaignPrefill) => void;
   /** Full prior transcript to resume onto (a persisted conversation the host
@@ -2197,7 +2197,7 @@ The content has been updated across all channels to reflect your changes.`;
     const coMarketer = marketingAgents.find(agent => agent.id === 'co-marketer');
     const executionMessage: ChatMessageData = {
       type: 'chat',
-      agentName: coMarketer?.name || "Cori",
+      agentName: coMarketer?.name || "Zeno",
       avatarSrc: coMarketer?.avatarSrc,
       avatarIcon: coMarketer?.icon,
       avatarBgClass: coMarketer?.colorClass,
@@ -2209,7 +2209,7 @@ The content has been updated across all channels to reflect your changes.`;
         setTimeout(() => {
           const followUpMessage: ChatMessageData = {
             type: 'chat',
-            agentName: coMarketer?.name || "Cori",
+            agentName: coMarketer?.name || "Zeno",
             avatarSrc: coMarketer?.avatarSrc,
             avatarIcon: coMarketer?.icon,
             avatarBgClass: coMarketer?.colorClass,
@@ -2374,12 +2374,12 @@ The content has been updated across all channels to reflect your changes.`;
     mockMessageTimeoutRef.current = setTimeout(() => step(0), 500);
   };
 
-  // --- Cori App Push "cart recovery" flow ------------------------------------
+  // --- Zeno App Push "cart recovery" flow ------------------------------------
   // Typing "create an app push campaign for users who added products to their
-  // cart" in the campaigns chat plays this instead of CAMPAIGNS_FLOW: Cori asks
+  // cart" in the campaigns chat plays this instead of CAMPAIGNS_FLOW: Zeno asks
   // Questions cards, drafts the notification on template 80006, shows a brief,
   // and "Preview campaign" hands it to the creation wizard's preview screen.
-  // Pill labels shown above the composer while Cori works on the current turn —
+  // Pill labels shown above the composer while Zeno works on the current turn —
   // specific to the app push step instead of the generic insights ones.
   const [coriLoaderLabels, setCoriLoaderLabels] = useState<string[] | null>(null);
   // The Questions card in flight — docked above the composer (not in the thread)
@@ -2389,7 +2389,7 @@ The content has been updated across all channels to reflect your changes.`;
     active: false, one: {}, two: {}, draft: null,
   });
 
-  /** Thinking beat, then one Cori message (optionally carrying a flow card). */
+  /** Thinking beat, then one Zeno message (optionally carrying a flow card). */
   const playCoriReply = (
     reply: { content: string; pushFlowCard?: PushFlowCard; inlineCard?: PushFlowCard; setupApplyCard?: SetupApplyCardData },
     reasoningSteps?: string[],
@@ -2449,8 +2449,8 @@ The content has been updated across all channels to reflect your changes.`;
     stickToBottomFor(2500);
   };
 
-  // --- Cori builds an audience in conversation ---------------------------------
-  // "I want to increase repeat purchases…" in the wizard's chat: Cori narrows the
+  // --- Zeno builds an audience in conversation ---------------------------------
+  // "I want to increase repeat purchases…" in the wizard's chat: Zeno narrows the
   // goal with a few questions while the Audience step updates beside it (see
   // data/audienceAgentFlow). Only runs when the wizard hosts this chat.
   const audFlowRef = useRef<{ active: boolean; state: AudienceAgentState }>({ active: false, state: {} });
@@ -2527,7 +2527,7 @@ The content has been updated across all channels to reflect your changes.`;
     );
   };
 
-  /** Content step, "Cart reminder": Cori writes v1 and drops it into the editor. */
+  /** Content step, "Cart reminder": Zeno writes v1 and drops it into the editor. */
   // 1 once v1 is on screen and waiting for feedback; 2 after v2.
   const cartVersionRef = useRef(0);
 
@@ -2687,7 +2687,7 @@ The content has been updated across all channels to reflect your changes.`;
     }, 7500);
   };
 
-  /** Feedback on v1: Cori writes v2 with the discount and the urgency. */
+  /** Feedback on v1: Zeno writes v2 with the discount and the urgency. */
   const startCartReminderV2 = (message: string) => {
     cartVersionRef.current = 2;
     setDynamicSuggestions(null);
@@ -2852,7 +2852,7 @@ The content has been updated across all channels to reflect your changes.`;
   };
 
   /** "I want to target users who added to cart but haven't checked out" — no
-   *  channel named, so Cori recommends one before asking anything about the
+   *  channel named, so Zeno recommends one before asking anything about the
    *  campaign. Confirming App Push carries straight on into the usual flow. */
   const startChannelAsk = (message: string) => {
     pushFlowRef.current = { active: true, one: {}, two: {}, draft: null };
@@ -3145,7 +3145,7 @@ The content has been updated across all channels to reflect your changes.`;
       return;
     }
     if (event.type === 'changes') {
-      appendUserTurn({ content: 'Make changes with Cori' });
+      appendUserTurn({ content: 'Make changes with Zeno' });
       playCoriReply(
         { content: 'Sure. Tell me what to change, or open Preview campaign and use Edit on any section.' },
         undefined,
@@ -3463,7 +3463,7 @@ The content has been updated across all channels to reflect your changes.`;
       return;
     }
 
-    // Cori's App Push cart-recovery conversation outranks the generic stories
+    // Zeno's App Push cart-recovery conversation outranks the generic stories
     // below — its prompt would otherwise match a deep-research opener.
     if (conversationVariant === 'campaigns') {
       if (contentAgent && dockedQuestions && String(dockedQuestions.stage).startsWith('qr-')) {
@@ -4298,7 +4298,7 @@ The content has been updated across all channels to reflect your changes.`;
             const aiResponse: ChatMessageData = {
               type: 'chat',
               isAI: true,
-              agentName: coMarketer?.name || 'Cori',
+              agentName: coMarketer?.name || 'Zeno',
               avatarIcon: coMarketer?.icon,
               avatarBgClass: coMarketer?.colorClass,
               content:
@@ -4621,7 +4621,7 @@ The content has been updated across all channels to reflect your changes.`;
             <div className="flex items-center justify-center rounded-full overflow-hidden shrink-0 size-[24px] bg-[var(--color-plum)]">
               <img
                 src="/co-marketer-logo.gif"
-                alt="Cori"
+                alt="Zeno"
                 className="size-full object-cover"
               />
             </div>
@@ -4629,7 +4629,7 @@ The content has been updated across all channels to reflect your changes.`;
               className="font-bold text-[16px] leading-[20px] text-[var(--color-ink)] whitespace-nowrap"
               style={{ fontFamily: "Manrope, sans-serif" }}
             >
-              Cori
+              Zeno
             </span>
           </div>
         </div>
@@ -4663,7 +4663,7 @@ The content has been updated across all channels to reflect your changes.`;
       <div className="flex items-center gap-3">
         <div className="flex flex-col pl-3">
           <div className="flex items-center gap-2">
-            <h1 className="text-lg font-semibold text-foreground">Cori</h1>
+            <h1 className="text-lg font-semibold text-foreground">Zeno</h1>
           </div>
           <p className="text-xs text-muted-foreground leading-tight">Your assistant for data-driven success</p>
         </div>
@@ -5590,7 +5590,7 @@ The content has been updated across all channels to reflect your changes.`;
                       showExecuteFlowCTA={
                         index === messages.length - 1 &&
                         mockChatCompleted &&
-                        message.agentName === "Cori" &&
+                        message.agentName === "Zeno" &&
                         message.content.startsWith("Here's a summary of what our team has put together:") &&
                         !isMockAgentChatActive
                       }
@@ -5836,7 +5836,7 @@ The content has been updated across all channels to reflect your changes.`;
                     ) : (
                       <div className="feedback-nudge-in inline-flex items-center gap-[10px] rounded-[12px] border border-[var(--color-line)] bg-card px-[16px] py-[10px] shadow-[0px_8px_24px_-6px_oklch(0.21_0.034_263.436_/_0.22)]">
                         <span className="text-[14px] text-[var(--color-ink)] whitespace-nowrap" style={{ fontFamily: 'Manrope, sans-serif' }}>
-                          Was your Cori experience helpful?
+                          Was your Zeno experience helpful?
                         </span>
                         <button
                           type="button"
@@ -5866,7 +5866,7 @@ The content has been updated across all channels to reflect your changes.`;
                     )}
                   </div>
                 )}
-                {/* Cori's follow-up Questions card, in line with the input field */}
+                {/* Zeno's follow-up Questions card, in line with the input field */}
                 {/* A question the host needs answered first — same spot, same width
                     as the app push flow's own Questions card. */}
                 {approvalCard && (
@@ -5966,7 +5966,7 @@ The content has been updated across all channels to reflect your changes.`;
                           className="text-[12px] text-[var(--color-grey)] text-center"
                           style={{ fontFamily: "Manrope, sans-serif", fontWeight: 400 }}
                         >
-                          Cori can make mistakes. Please double check responses
+                          Zeno can make mistakes. Please double check responses
                         </p>
                       </div>
                     )}
@@ -5982,7 +5982,7 @@ The content has been updated across all channels to reflect your changes.`;
                   className="text-[12px] text-[var(--color-grey)] text-center w-full max-w-[768px] px-[28px]"
                   style={{ fontFamily: "Manrope, sans-serif", fontWeight: 400 }}
                 >
-                  Cori can make mistakes. Please double check responses
+                  Zeno can make mistakes. Please double check responses
                 </p>
               </div>
             )}

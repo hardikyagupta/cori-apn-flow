@@ -5,8 +5,8 @@ import { toLocalInput } from "@/components/campaigns/campaign-creation/CampaignS
 import { COUPON_EXPIRY_TEMPLATE_ID } from "@/components/campaigns/campaign-creation/appPushTemplates.data";
 
 /**
- * Cori's App Push "cart recovery" conversation — typed into the docked Cori
- * window on /campaigns. Cori asks one short set of questions at a time
+ * Zeno's App Push "cart recovery" conversation — typed into the docked Zeno
+ * window on /campaigns. Zeno asks one short set of questions at a time
  * (CoriQuestionsCard), drafts the notification on the Coupon Expiry Reminder
  * template (ID 80006), then hands a campaign brief to the wizard's preview.
  */
@@ -20,7 +20,7 @@ export function isPushCartPrompt(message: string): boolean {
 }
 
 /** The channel-agnostic opener — the marketer names who to reach, not the
- *  channel, so Cori recommends one first (see CHANNEL_QUESTION). */
+ *  channel, so Zeno recommends one first (see CHANNEL_QUESTION). */
 export function isChannelAskPrompt(message: string): boolean {
   const mentionsCart = /cart|basket|abandon/i.test(message);
   const leftWithoutBuying =
@@ -30,17 +30,17 @@ export function isChannelAskPrompt(message: string): boolean {
   return mentionsCart && leftWithoutBuying && !isPushCartPrompt(message);
 }
 
-/** The Content step's "Cart reminder" ask — Cori drafts the notification itself. */
+/** The Content step's "Cart reminder" ask — Zeno drafts the notification itself. */
 export function isCartReminderPrompt(message: string): boolean {
   return /cart/i.test(message) && /(reminder|nudg|finish|complete|abandon)/i.test(message) && /(title|message|push|notification|reminder)/i.test(message);
 }
 
 /** Title of the card that sends the marketer from Audience on to Content. */
 export const PUSH_CONTENT_CTA = "Write the notification";
-/** Cori's hand-back to the Audience step after a review finding changed it. */
+/** Zeno's hand-back to the Audience step after a review finding changed it. */
 export const PUSH_AUDIENCE_CTA = "Review the audience";
 
-/** v1 of the cart reminder Cori writes on the Content step. */
+/** v1 of the cart reminder Zeno writes on the Content step. */
 export const CART_REMINDER_V1 = {
   title: "Your cart is waiting! 🛒",
   message: "Complete your purchase before your favourites are gone.",
@@ -54,7 +54,7 @@ export const CART_REMINDER_V2 = {
   media: "https://img.magnific.com/free-vector/halftone-style-comic-sale-background-yellow-white-color_1017-59305.jpg",
 };
 
-/** The one-tap feedback Cori offers under v1. */
+/** The one-tap feedback Zeno offers under v1. */
 export const CART_V2_FEEDBACK =
   "Make the offer more specific by showing the discount amount, and create more urgency by highlighting that the exclusive offer ends tonight.";
 
@@ -63,7 +63,7 @@ export function isCartFeedbackPrompt(message: string): boolean {
   return /(discount|offer|amount|specific|urgen|tonight|ends|hurry|deadline|limited)/i.test(message);
 }
 
-/** What the wizard's Content step hands Cori so a drafted notification lands
+/** What the wizard's Content step hands Zeno so a drafted notification lands
  *  in the editor. */
 export interface ContentAgentHost {
   onDraft: (draft: {
@@ -86,11 +86,11 @@ export interface PushVariation {
   title: string;
   message: string;
   buttonText: string;
-  /** The image Cori generates for this angle. */
+  /** The image Zeno generates for this angle. */
   image: string;
 }
 
-/** The three angles Cori writes the quick reply in; the first goes in the editor. */
+/** The three angles Zeno writes the quick reply in; the first goes in the editor. */
 export function quickReplyVariations(product: string): PushVariation[] {
   const first = quickReplyDraft(product);
   const herbal = /herbal/i.test(product);
@@ -114,7 +114,7 @@ export function quickReplyVariations(product: string): PushVariation[] {
   ];
 }
 
-// — "I want to send a brochure…" — Cori recommends and builds a quick reply template —
+// — "I want to send a brochure…" — Zeno recommends and builds a quick reply template —
 
 /** An offer the marketer wants customers to respond to. */
 export function isBrochurePrompt(message: string): boolean {
@@ -164,7 +164,7 @@ export function themesFor(answer: string): string[] {
   return one ? [one.name] : QR_THEMES.map((t) => t.name);
 }
 
-/** The first quick reply template Cori writes, for the product the marketer picked. */
+/** The first quick reply template Zeno writes, for the product the marketer picked. */
 export function quickReplyDraft(product: string) {
   return {
     title: `${product} @20% OFF`,
@@ -173,7 +173,7 @@ export function quickReplyDraft(product: string) {
   };
 }
 
-/** The image Cori adds when asked — a product shot of the herbal creams. */
+/** The image Zeno adds when asked — a product shot of the herbal creams. */
 export const QR_IMAGE = "/campaign-assets/regular-layout/herbal-creams.jpg";
 
 export function qrImageFeedback(product: string): string {
@@ -257,12 +257,12 @@ export const SEND_OPTIMIZER = "Use the Send time optimizer agent";
 export const CHANNEL_YES = "Yes, use App Push";
 export const CHANNEL_EXPLORE = "Explore other channels";
 
-/** Cori's recommendation, said before any campaign question is asked. */
+/** Zeno's recommendation, said before any campaign question is asked. */
 export const CHANNEL_RECOMMENDATION =
   "App Push has delivered a 24% higher engagement rate than your other channels over the last 30 days, making it a strong choice to re-engage shoppers who haven't completed their purchase. Would you like to use it for this campaign?";
 
 /**
- * Parked for now: Cori only builds App Push campaigns, so it no longer asks
+ * Parked for now: Zeno only builds App Push campaigns, so it no longer asks
  * whether to use App Push — it says why it fits and moves on to the audience.
  * Flip to true to ask "Would you like to use App Push?" again (the question,
  * its follow-ups and the "Explore other channels" path are all still wired).
@@ -349,7 +349,7 @@ export interface PushCartDraft {
   sendLabel: string;
 }
 
-/** What Cori's recommendation for "Use the Send time optimizer agent" says. */
+/** What Zeno's recommendation for "Use the Send time optimizer agent" says. */
 export const OPTIMIZER_RECOMMENDATION = "Today, 7:30 PM";
 export const COUNTDOWN_PREVIEW = "09:34:28";
 

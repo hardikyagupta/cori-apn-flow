@@ -285,7 +285,7 @@ function GetInsightsLink({ onClick }: { onClick?: () => void }) {
       <TooltipTrigger asChild>
         <button
           type="button"
-          aria-label="Ask Cori"
+          aria-label="Ask Zeno"
           onClick={onClick}
           className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-[#F0F5FF]"
         >
@@ -297,7 +297,7 @@ function GetInsightsLink({ onClick }: { onClick?: () => void }) {
         className="border-0 bg-foreground text-background text-[12px] leading-[16px] px-[8px] py-[4px]"
         style={{ fontFamily: "Manrope, sans-serif", fontWeight: 500 }}
       >
-        Ask Cori
+        Ask Zeno
       </TooltipContent>
     </Tooltip>
   );
@@ -572,7 +572,7 @@ export default function AiDashboard() {
             <div className="mt-4 flex flex-col items-center gap-4 rounded-[8px] p-4 drop-shadow-[0px_-4px_10px_rgba(177,177,177,0.2)]">
               <div className="flex w-full flex-col items-center gap-2">
                 <p className="w-full text-center font-manrope text-[12px] font-medium text-[#17173A]">
-                  Have something else in mind? Ask Cori
+                  Have something else in mind? Ask Zeno
                 </p>
                 <div className="chip-marquee w-full">
                   <div className="chip-marquee-track flex w-max gap-4 pb-1">
@@ -769,10 +769,10 @@ export default function AiDashboard() {
                 </div>
                 <div className="flex min-w-0 flex-1 flex-col gap-1.5">
                   <p className="text-[16px] font-bold leading-[22px] text-[#17173A]">
-                    Make Cori more relevant to you
+                    Make Zeno more relevant to you
                   </p>
                   <p className="text-[13px] leading-[19px] text-[#6F6F8D]">
-                    Tell us what you care about, and Cori will prioritize insights, recommendations, and
+                    Tell us what you care about, and Zeno will prioritize insights, recommendations, and
                     actions around your goals.
                   </p>
                   <p className="text-[11px] font-medium text-[#6F6F8D]">
@@ -784,7 +784,7 @@ export default function AiDashboard() {
                   onClick={openPersonalize}
                   className="shrink-0 rounded-[6px] bg-[#2F68E5] px-4 py-2.5 text-[13px] font-semibold text-white transition-colors hover:bg-[#255ad2]"
                 >
-                  Personalize Cori
+                  Personalize Zeno
                 </button>
               </div>
             )}
@@ -828,7 +828,7 @@ export default function AiDashboard() {
               setIsPersonalized(true);
               toast({
                 title: isPersonalizeEditing ? "Preferences updated" : "Preferences saved",
-                description: "Cori will now prioritize insights around what matters to you.",
+                description: "Zeno will now prioritize insights around what matters to you.",
               });
             }}
           />

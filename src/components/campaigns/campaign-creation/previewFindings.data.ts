@@ -37,7 +37,7 @@ export interface Finding {
     setupPatch?: Partial<SetupValues>;
     /** App Push: a change to the notification being drafted. */
     pushDraftPatch?: Partial<RegularLayoutDraft>;
-    /** App Push: a segment Cori builds for the marketer, applied from the thread. */
+    /** App Push: a segment Zeno builds for the marketer, applied from the thread. */
     audienceDraft?: AudienceDraft;
     audienceScope?: "segment" | "exclusions";
   };

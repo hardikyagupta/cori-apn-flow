@@ -14,7 +14,7 @@ import { AndroidPreview, IosPreview, hasDraftContent, type RegularLayoutDraft } 
 
 const nf = new Intl.NumberFormat("en-US");
 
-/** A segment Cori built: sparkle, then its name — read-only here. */
+/** A segment Zeno built: sparkle, then its name — read-only here. */
 function AiSegmentPill({ name }: { name: string }) {
   return (
     <span className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-[#DDE2EE] bg-white px-3 py-1.5 font-manrope text-sm font-medium text-[#17173A]">
@@ -155,7 +155,7 @@ export default function PushPreviewBody({
         ? "Send later"
         : schedule.mode === "slice"
           ? "Send in batches"
-          : "Optimise with Cori";
+          : "Optimise with Zeno";
   const whenDetail =
     schedule.mode === "later"
       ? describeSlot(schedule.sendAt)

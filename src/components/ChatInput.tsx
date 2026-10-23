@@ -81,7 +81,7 @@ const getDocVisual = (category: AttachmentCategory) => {
 };
 
 const agents: Agent[] = [
-  { id: "co-marketer", name: "Cori" },
+  { id: "co-marketer", name: "Zeno" },
   { id: "content-agent", name: "Content Agent" },
   { id: "segment-agent", name: "Segment Agent" },
   { id: "scheduler-agent", name: "Scheduler Agent" },
@@ -1029,7 +1029,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
                         ? "linear-gradient(180deg, oklch(1 0 0 / 0) 0%, oklch(1 0 0 / 0.24) 100%), linear-gradient(90deg, var(--color-royal) 0%, var(--color-royal) 100%)"
                         : "linear-gradient(90deg, oklch(0 0 0 / 0.08) 0%, oklch(0 0 0 / 0.08) 100%), linear-gradient(180deg, oklch(1 0 0 / 0) 0%, oklch(1 0 0 / 0.24) 100%)",
                     }}
-                    aria-label={isLoading ? "Stop Cori response" : "Send message"}
+                    aria-label={isLoading ? "Stop Zeno response" : "Send message"}
                   >
                     {/* Inner highlight for active state */}
                     {isActive && (
@@ -1052,7 +1052,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
                     className="border-0 bg-foreground text-background text-[12px] leading-[16px] px-[8px] py-[4px]"
                     style={{ fontFamily: 'Manrope, sans-serif', fontWeight: 500 }}
                   >
-                    Stop Cori response
+                    Stop Zeno response
                   </TooltipContent>
                 )}
               </Tooltip>

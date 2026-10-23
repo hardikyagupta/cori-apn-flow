@@ -431,7 +431,7 @@ export function reachFor(v: AudienceValues): number {
  * why everything here is editable afterwards rather than read-only.
  */
 /** Parked: the banner that hands the audience to the Segment agent in the
- *  chat. Cori now builds one from a typed goal instead (audienceAgentFlow). */
+ *  chat. Zeno now builds one from a typed goal instead (audienceAgentFlow). */
 const SHOW_SEGMENT_AGENT_BANNER = false;
 
 /**

@@ -18,7 +18,7 @@ export default function CoMarketerNudge({
   onNext: () => void;
 }) {
   return (
-    <div className="relative w-[320px]" role="dialog" aria-label="Meet Cori">
+    <div className="relative w-[320px]" role="dialog" aria-label="Meet Zeno">
       {/* Pointer arrow — points up to the Ask co-marketer button. Sits above the
           clipped card so it isn't cut off by overflow-hidden. */}
       <span
@@ -31,7 +31,7 @@ export default function CoMarketerNudge({
         <div className="h-[293.6px] w-[320px] shrink-0">
           <img
             src={nudgeGif}
-            alt="Cori generating a segment"
+            alt="Zeno generating a segment"
             className="pointer-events-none h-full w-full object-cover"
           />
         </div>
@@ -39,7 +39,7 @@ export default function CoMarketerNudge({
         {/* Capability blurb — describes what the AI agent can do. */}
         <div className="flex items-center justify-center p-[16px]">
           <p className="min-w-px flex-1 break-words font-manrope text-[14px] font-medium leading-[22px] text-black">
-            Meet Cori, your AI marketing agent. Just describe what you need
+            Meet Zeno, your AI marketing agent. Just describe what you need
             in plain language and it generates insights, builds segments, designs
             journeys, and more.
           </p>

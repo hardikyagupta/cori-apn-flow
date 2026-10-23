@@ -89,7 +89,7 @@ export default function SegmentSuggestions({
         <p className="flex-1 font-manrope text-[14px] font-bold text-[#17173A]">
           Pick a starting point —{" "}
           <span className="font-medium text-[#6F6F8D]">
-            Cori builds the segment for you
+            Zeno builds the segment for you
           </span>
         </p>
       </div>

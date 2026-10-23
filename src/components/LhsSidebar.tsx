@@ -106,7 +106,7 @@ export const defaultChats: LhsChatItem[] = [
   { id: '17', title: 'Review Claude API rate limits', time: '1mo', owner: 'Rahul Menon' },
   { id: '18', title: 'Optimize token usage in chains', time: '1mo' },
   { id: '19', title: 'Write tests for agent hooks', time: '1mo', owner: 'Priya Nair' },
-  { id: '20', title: 'Ship Cori v1', time: '1mo', owner: 'Dani Bristow' },
+  { id: '20', title: 'Ship Zeno v1', time: '1mo', owner: 'Dani Bristow' },
 ];
 
 // 40×40 slot that centers an icon. Matches the collapsed rail's inner width
@@ -243,7 +243,7 @@ const LhsSidebar: React.FC<LhsSidebarProps> = ({
         <button
           type="button"
           onClick={collapsed ? (e) => { e.stopPropagation(); onToggleCollapse?.(); } : undefined}
-          aria-label={collapsed ? 'Expand sidebar' : 'Cori'}
+          aria-label={collapsed ? 'Expand sidebar' : 'Zeno'}
           className={cn(
             'group relative flex items-center justify-center w-[40px] h-[40px] shrink-0 rounded-[8px]',
             'cursor-default'
@@ -262,7 +262,7 @@ const LhsSidebar: React.FC<LhsSidebarProps> = ({
           >
             <img
               src="/co-marketer-logo.gif"
-              alt="Cori"
+              alt="Zeno"
               className="size-full object-cover"
             />
           </span>
@@ -280,7 +280,7 @@ const LhsSidebar: React.FC<LhsSidebarProps> = ({
           className={cn('flex-1 min-w-0 font-bold text-[16px] leading-[20px] text-[var(--color-ink)]', labelCls)}
           style={labelStyle({ fontFamily: 'Manrope, sans-serif' })}
         >
-          Cori
+          Zeno
         </span>
 
         {!collapsed && (

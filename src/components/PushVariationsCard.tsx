@@ -20,7 +20,7 @@ const ROWS: { field: Exclude<VariationField, "image">; label: string }[] = [
 ];
 
 /**
- * Cori's copy variations for a notification, one at a time with a pager.
+ * Zeno's copy variations for a notification, one at a time with a pager.
  * Each line can be sent to the editor on its own or copied.
  */
 export default function PushVariationsCard({
