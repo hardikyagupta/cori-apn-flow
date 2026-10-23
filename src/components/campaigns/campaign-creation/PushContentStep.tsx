@@ -446,7 +446,7 @@ export default function PushContentStep({
   onDraftChange: (update: (d: RegularLayoutDraft) => RegularLayoutDraft) => void;
   /** The marketer started a blank notification themselves. */
   onCreateFresh?: () => void;
-  /** A notification Cori drafted — fills the editor and opens it. */
+  /** A notification Zeno drafted — fills the editor and opens it. */
   seed?: { title: string; message: string; media?: string; buttonText?: string; n: number } | null;
 }) {
   const [layout, setLayout] = useState<LayoutKind | "new" | null>(null);

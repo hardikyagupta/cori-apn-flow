@@ -2,8 +2,8 @@ import type { AdhocCondition } from "@/components/campaigns/campaign-creation/Ca
 import type { FlowQuestion } from "@/data/pushCartFlow";
 
 /**
- * Cori builds an audience in conversation, from the wizard's docked chat.
- * The marketer states a business goal ("increase repeat purchases…"); Cori
+ * Zeno builds an audience in conversation, from the wizard's docked chat.
+ * The marketer states a business goal ("increase repeat purchases…"); Zeno
  * narrows it with a handful of questions, and the Audience step on the left
  * updates as the answers come in — first a draft, then a refined segment —
  * until the marketer applies it.
@@ -208,7 +208,7 @@ export function buildAudienceDraft(state: AudienceAgentState): AudienceDraft {
   };
 }
 
-/** The line Cori says once it has the recency and the checkout answer. */
+/** The line Zeno says once it has the recency and the checkout answer. */
 export function draftSentence(state: AudienceAgentState): string {
   const win = windowFor(state.recency ?? "");
   const what =

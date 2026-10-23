@@ -690,7 +690,7 @@ export default function CampaignAIPanel({
     <aside className="flex w-[320px] shrink-0 flex-col pt-5">
       <div className="flex items-center gap-1.5">
         <img src={sparkle} alt="" className="h-5 w-5 shrink-0" />
-        <h2 className="font-manrope text-base font-bold text-[#17173A]">Cori</h2>
+        <h2 className="font-manrope text-base font-bold text-[#17173A]">Zeno</h2>
       </div>
       <p className="mb-4 mt-1 font-manrope text-xs text-[#6F6F8D]">
         Suggestions based on your campaign goal.

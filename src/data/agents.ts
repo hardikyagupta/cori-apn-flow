@@ -27,7 +27,7 @@ export interface MarketingAgent {
 export const marketingAgents: MarketingAgent[] = [
   {
     id: "co-marketer",
-    name: "Cori",
+    name: "Zeno",
     description: "Helps plan and optimize marketing campaigns",
     avatarSrc: "/AgentIcons/Co-Marketer.svg",
     icon: Bot, // Lucide icon as fallback

@@ -5,7 +5,7 @@ import { hasDraftContent, type RegularLayoutDraft } from "./PushRegularLayoutEdi
 import type { Finding } from "./previewFindings.data";
 import { buildAudienceDraft, INTEREST_CART } from "@/data/audienceAgentFlow";
 
-/** The tighter audience Cori builds: recent cart adders who haven't bought,
+/** The tighter audience Zeno builds: recent cart adders who haven't bought,
  *  with recent buyers and anyone already in a journey held back. */
 function tighterAudience() {
   return buildAudienceDraft({
@@ -19,7 +19,7 @@ function tighterAudience() {
 }
 
 /**
- * What Cori says about an App Push campaign at preview time — the push
+ * What Zeno says about an App Push campaign at preview time — the push
  * counterpart of buildFindings. Read off the real form values, so each finding
  * is true of the campaign on screen and each fix writes back to a real field.
  * The evidence lines are illustrative, in the same spirit as the email review.
@@ -35,7 +35,7 @@ export function buildPushFindings({
   content: ContentValues;
   schedule: ScheduleValues;
   draft: RegularLayoutDraft;
-  /** Parts Cori built herself — her own work has no flaws to flag, so those
+  /** Parts Zeno built herself — her own work has no flaws to flag, so those
    *  sections are skipped. Only what the marketer set by hand is audited. */
   aiMade?: { timing?: boolean; audience?: boolean; content?: boolean };
 }): Finding[] {
@@ -65,7 +65,7 @@ export function buildPushFindings({
 
   // — Audience ————————————————————————————————————————————
   if (aiMade.audience) {
-    // Cori cut this audience: nothing to flag.
+    // Zeno cut this audience: nothing to flag.
   } else if (audience.mode === "all") {
     out.push({
       id: "push-all-contacts",
@@ -121,7 +121,7 @@ export function buildPushFindings({
       verdict: "NEEDS ATTENTION",
       impact: "Blocks publish",
       detail: "There's nothing to send. Pick a template or create a notification.",
-      evidence: "Cart reminders written by Cori beat hand-written ones by 8% on taps in your account.",
+      evidence: "Cart reminders written by Zeno beat hand-written ones by 8% on taps in your account.",
       link: { stepId: "content", stepLabel: "Content", field: "Select layout" },
     });
     return out;

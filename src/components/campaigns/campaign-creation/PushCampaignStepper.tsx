@@ -6,7 +6,7 @@ import sparkle from "/campaign-assets/ic-sparkle.gif";
 
 /**
  * Top bar for App Push's step-by-step flow — the original campaign-creation
- * navbar: channel tile + editable campaign name on the left, Ask Cori / Next step / close on the right. The last step's primary button reads
+ * navbar: channel tile + editable campaign name on the left, Ask Zeno / Next step / close on the right. The last step's primary button reads
  * Preview. The step strip underneath is CampaignCreationStepper.
  */
 export default function PushCampaignNavbar({
@@ -16,7 +16,7 @@ export default function PushCampaignNavbar({
   isLastStep,
   onRenameCampaign,
   onAskCoMarketer,
-  askLabel = "Ask Cori",
+  askLabel = "Ask Zeno",
   onNext,
   onClose,
 }: {
@@ -25,9 +25,9 @@ export default function PushCampaignNavbar({
   icon: ComponentType<SVGProps<SVGSVGElement>>;
   isLastStep: boolean;
   onRenameCampaign: (name: string) => void;
-  /** Omit to hide the Ask Cori button. */
+  /** Omit to hide the Ask Zeno button. */
   onAskCoMarketer?: () => void;
-  /** The Cori button's label — "Audit the campaign with Cori" on the last step. */
+  /** The Zeno button's label — "Audit the campaign with Zeno" on the last step. */
   askLabel?: string;
   onNext: () => void;
   onClose: () => void;
@@ -48,7 +48,7 @@ export default function PushCampaignNavbar({
       </div>
 
       <div className="ml-auto flex items-center gap-3">
-        {/* Ask Cori — the top-nav CTA verbatim: rotating conic-gradient ring
+        {/* Ask Zeno — the top-nav CTA verbatim: rotating conic-gradient ring
             (.snake-border), sparkle GIF, h-8 to match the buttons beside it. */}
         {onAskCoMarketer && (
         <button

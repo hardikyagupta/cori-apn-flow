@@ -8,7 +8,7 @@ import sparkle from "/campaign-assets/ic-sparkle.gif";
 
 /**
  * Top bar of the campaign creation overlay — channel icon + campaign name on
- * the left, settings / Launch / Ask Cori / close on the right. Structure
+ * the left, settings / Launch / Ask Zeno / close on the right. Structure
  * follows the shared campaign-creation reference; styling is this app's
  * language (Manrope, #2F68E5 primary, #DDE2EE lines).
  */
@@ -140,7 +140,7 @@ export default function CampaignCreationNavbar({
           <span aria-hidden="true" className="snake-border" />
           <img src={sparkle} alt="" className="relative z-[1] h-5 w-5" />
           <span className="relative z-[1] font-manrope text-xs font-semibold tracking-[0.42px] text-ash">
-            Ask Cori
+            Ask Zeno
           </span>
         </button>
         <button

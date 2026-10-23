@@ -6,8 +6,8 @@ import { cn } from "@/lib/utils";
 import type { FlowAnswers, FlowQuestion } from "@/data/pushCartFlow";
 
 /**
- * Cori's follow-up question card, in the journey co-marketer's look
- * (CoMarketerQuestionCard): "Cori" eyebrow + close, bold title, outlined options, and
+ * Zeno's follow-up question card, in the journey co-marketer's look
+ * (CoMarketerQuestionCard): "Zeno" eyebrow + close, bold title, outlined options, and
  * a footer with the ∧ 1/N ∨ pager plus Skip / Continue. It adds what the app
  * push conversation needs on top: a free-text "Other" row, questions that only
  * join when an earlier answer calls for them (`showIf`), and a soft fade/slide
@@ -142,7 +142,7 @@ export default function CoriQuestionsCard({
     <div className="z-20 flex w-full flex-col overflow-hidden rounded-2xl border border-[#EBEBF5] bg-white shadow-[0_4px_16px_rgba(23,23,58,0.08)] [-webkit-text-size-adjust:100%] [text-size-adjust:100%]">
       <div className="flex shrink-0 items-start justify-between gap-3 px-4 pt-4">
         <p className="font-manrope font-bold uppercase tracking-[0.08em] text-[#6F6F8D]" style={{ fontSize: "11px" }}>
-          Cori
+          Zeno
         </p>
         <button
           type="button"

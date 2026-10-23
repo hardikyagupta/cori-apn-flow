@@ -31,7 +31,7 @@ const LhsSidebarCollapsed: React.FC<LhsSidebarCollapsedProps> = ({
           <div className="flex items-center justify-center rounded-full overflow-hidden shrink-0 size-[24px] bg-[var(--color-plum)]">
             <img
               src="/co-marketer-logo.gif"
-              alt="Cori"
+              alt="Zeno"
               className="size-full object-cover"
             />
           </div>

@@ -178,7 +178,7 @@ function ContentCard({
   );
 }
 
-/** Parked for now: the brief's Rich media row and its "Make changes with Cori" CTA. */
+/** Parked for now: the brief's Rich media row and its "Make changes with Zeno" CTA. */
 const SHOW_BRIEF_RICH_MEDIA = false;
 const SHOW_BRIEF_CHANGES = false;
 
@@ -234,7 +234,7 @@ function BriefCard({ draft, onEvent }: { draft: PushCartDraft; onEvent: (e: Push
               onEvent({ type: "changes" });
             }}
           >
-            Make changes with Cori
+            Make changes with Zeno
           </button>
         )}
         {saved ? (
@@ -285,7 +285,7 @@ function SavedCard({
   );
 }
 
-/** Renders whichever card the push-cart flow attached to a Cori message. */
+/** Renders whichever card the push-cart flow attached to a Zeno message. */
 export default function PushFlowCardView({
   card,
   onEvent,

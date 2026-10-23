@@ -153,7 +153,7 @@ const CHANNEL_ICONS: Record<string, ChannelIconComponent> = {
 const hasAIFlow = (channel: string) =>
   (SHOW_EMAIL_CORI && channel === "Email") || channel === "App Push Notification";
 
-/** Cori on Email (prompt screen, Ask Cori, docked chat) is parked for now —
+/** Zeno on Email (prompt screen, Ask Zeno, docked chat) is parked for now —
  *  flip to true to bring it all back. */
 const SHOW_EMAIL_CORI = false;
 
@@ -481,7 +481,7 @@ export default function CampaignCreationOverlay({
   /** Fired once the launching pop-up finishes, right before the wizard
    *  closes — the listing page uses this to add the row, toast, and confetti. */
   onLaunched?: (info: { name: string; aiGenerated: boolean }) => void;
-  /** A campaign Cori already drafted in chat (App Push) — the wizard opens
+  /** A campaign Zeno already drafted in chat (App Push) — the wizard opens
    *  straight on its preview screen with these values instead of the prompt. */
   prefill?: PushCampaignPrefill | null;
 }) {
@@ -546,14 +546,14 @@ export default function CampaignCreationOverlay({
   // Docked co-marketer chat, opened from the navbar CTA. `chatSession` is
   // bumped per open so the widget remounts on a fresh thread.
   const [chatOpenRaw, setChatOpen] = useState(false);
-  // Email has no Cori while SHOW_EMAIL_CORI is off, whatever tries to open it.
+  // Email has no Zeno while SHOW_EMAIL_CORI is off, whatever tries to open it.
   const chatOpen = chatOpenRaw && (SHOW_EMAIL_CORI || channel !== "Email");
   const [chatSession, setChatSession] = useState(0);
-  // A notification Cori drafted on the Content step; `n` makes each one a new event.
-  // The Regular layout notification written on the Content step (by hand or by Cori).
+  // A notification Zeno drafted on the Content step; `n` makes each one a new event.
+  // The Regular layout notification written on the Content step (by hand or by Zeno).
   const [pushDraft, setPushDraft] = useState<RegularLayoutDraft>(EMPTY_REGULAR_DRAFT);
   const autosave = useAutosave({ setup, audience, content, schedule, pushDraft });
-  // What Cori built for this App Push campaign, as opposed to set by hand.
+  // What Zeno built for this App Push campaign, as opposed to set by hand.
   const [coriMade, setCoriMade] = useState({ audience: false, content: false });
   const [contentSeed, setContentSeed] = useState<{ title: string; message: string; media?: string; buttonText?: string; n: number } | null>(null);
   const [chatTopic, setChatTopic] = useState<SeededTopic | null>(null);
@@ -579,7 +579,7 @@ export default function CampaignCreationOverlay({
   const audienceSeeded = useRef(false);
   // Whether the open chat is the audience thread — it closes when the step does.
   const audienceChat = useRef(false);
-  // The segment Cori has drafted but the marketer hasn't applied yet — it stays
+  // The segment Zeno has drafted but the marketer hasn't applied yet — it stays
   // in the chat until they choose Apply audience.
   const pendingAudience = useRef<AudienceDraft | null>(null);
   // Scroll container + per-card nodes, so opening a card can bring its header
@@ -650,7 +650,7 @@ export default function CampaignCreationOverlay({
     return () => clearTimeout(id);
   }, [open]);
 
-  // A campaign drafted in Cori's chat lands here fully built, on the preview
+  // A campaign drafted in Zeno's chat lands here fully built, on the preview
   // screen — declared after the open effect above so its values win.
   useEffect(() => {
     if (!open || !prefill || channel !== "App Push Notification") return;
@@ -784,14 +784,14 @@ export default function CampaignCreationOverlay({
     setFollowUpSeq(0);
   }, [open, focusStepId, openStepIds]);
 
-  // App Push: the docked Cori follows the stepper. Moving to another step starts
+  // App Push: the docked Zeno follows the stepper. Moving to another step starts
   // that step's own conversation (Content gets the template prompts) instead of
   // carrying the previous step's thread along.
   const pushStepId =
     channel === "App Push Notification" || (EMAIL_STEPPER && channel === "Email")
       ? PUSH_STEPS[stepIndex]?.id
       : undefined;
-  // App Push opens Cori by default: when the stepper first appears for a new
+  // App Push opens Zeno by default: when the stepper first appears for a new
   // campaign, and again on every step after that. Each step starts its own
   // conversation (Content gets the template prompts) instead of carrying the
   // previous step's thread along.
@@ -812,7 +812,7 @@ export default function CampaignCreationOverlay({
     setChatOpen(true);
   }, [pushWizardStep]);
 
-  // App Push: the preview opens without Cori docked — a nudge on the preview
+  // App Push: the preview opens without Zeno docked — a nudge on the preview
   // offers the audit instead. (Kept above the `mounted` early return so the hook
   // order never changes between renders.)
   const wasPreviewOpen = useRef(false);
@@ -918,7 +918,7 @@ export default function CampaignCreationOverlay({
     },
   }));
 
-  // App Push Content step: "Cart reminder" asks Cori to write v1 of the notification.
+  // App Push Content step: "Cart reminder" asks Zeno to write v1 of the notification.
   const pushContentChips: StarterChip[] = PUSH_STEP_CHIPS.content.map((chip) =>
     chip.label === "Cart reminder"
       ? {
@@ -1291,7 +1291,7 @@ export default function CampaignCreationOverlay({
     }
   };
 
-  /** A draft (then a refined draft) from Cori's conversation, plotted onto the
+  /** A draft (then a refined draft) from Zeno's conversation, plotted onto the
    *  Audience fields the same way a picked cut is. */
   const plotAudienceDraft = (d: AudienceDraft) => {
     setAudience((a) => ({
@@ -1408,7 +1408,7 @@ export default function CampaignCreationOverlay({
       return undefined;
     };
 
-    // A finding Cori can fix by building a segment: she builds it right here.
+    // A finding Zeno can fix by building a segment: she builds it right here.
     const seg = action?.audienceDraft;
     if (seg) {
       const exclusionsOnly = action?.audienceScope === "exclusions";
@@ -1473,8 +1473,8 @@ export default function CampaignCreationOverlay({
     findings,
   });
 
-  // A whole campaign built from Cori's brief has nothing for the review to flag;
-  // otherwise only the parts Cori built herself are left alone.
+  // A whole campaign built from Zeno's brief has nothing for the review to flag;
+  // otherwise only the parts Zeno built herself are left alone.
   const pushAiMade = prefill
     ? { timing: true, audience: true, content: true }
     : { audience: coriMade.audience, content: coriMade.content && content.templateId === null };
@@ -1617,7 +1617,7 @@ export default function CampaignCreationOverlay({
             applyCohort(cohort);
             return;
           }
-          // App Push review: a segment Cori built, applied to the Audience step.
+          // App Push review: a segment Zeno built, applied to the Audience step.
           if (card.audienceDraft) {
             if (card.audienceScope === "exclusions") {
               setAudience((a) => ({
@@ -1669,7 +1669,7 @@ export default function CampaignCreationOverlay({
             setPushDraft((d) => ({ ...d, ...card.pushDraftPatch }));
             return;
           }
-          // App Push: Cori's hand-back to the Audience step after a review change.
+          // App Push: Zeno's hand-back to the Audience step after a review change.
           if (card.kind === "cta" && card.title === PUSH_AUDIENCE_CTA) {
             const to = PUSH_STEPS.findIndex((st) => st.id === "audience");
             setStepIndex(to);
@@ -1677,7 +1677,7 @@ export default function CampaignCreationOverlay({
             canvasRef.current?.scrollTo({ top: 0 });
             return;
           }
-          // App Push: Cori's hand-off from Audience to the Content step.
+          // App Push: Zeno's hand-off from Audience to the Content step.
           if (card.kind === "cta" && card.title === PUSH_CONTENT_CTA) {
             const to = PUSH_STEPS.findIndex((st) => st.id === "content");
             setStepIndex(to);
@@ -1876,7 +1876,7 @@ export default function CampaignCreationOverlay({
             setFocusStepId(stepId);
             setPreviewOpen(false);
           }}
-          // App Push: Cori reviews the campaign when asked, not by default.
+          // App Push: Zeno reviews the campaign when asked, not by default.
           onAskCoMarketer={
             isPushChannel ? handleAuditCampaign : channel !== "Email" || SHOW_EMAIL_CORI ? openFreshChat : undefined
           }
@@ -1905,7 +1905,7 @@ export default function CampaignCreationOverlay({
                   ? openFreshChat
                   : undefined
             }
-            askLabel={isPushChannel && stepIndex === PUSH_STEPS.length - 1 ? "Audit the campaign with Cori" : undefined}
+            askLabel={isPushChannel && stepIndex === PUSH_STEPS.length - 1 ? "Audit the campaign with Zeno" : undefined}
             onNext={goNextPushStep}
             onClose={onClose}
           />
@@ -1928,7 +1928,7 @@ export default function CampaignCreationOverlay({
               chatOpen ? "pr-6" : "pr-14"
             )}
           >
-            {/* 3/4 of the canvas by default; with Cori docked the canvas is already
+            {/* 3/4 of the canvas by default; with Zeno docked the canvas is already
                 narrower, so the content takes all of it. The layout picker also takes
                 it all — seven cards a row need the room (see PushContentStep). */}
             <div className={chatOpen || PUSH_STEPS[stepIndex].id === "content" ? "w-full" : "w-3/4"}>

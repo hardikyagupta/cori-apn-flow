@@ -50,10 +50,10 @@ const Settings: React.FC = () => {
         <div className="flex items-center px-[12px] h-[56px] shrink-0">
           <div className={ICON_SLOT}>
             <div className="flex items-center justify-center rounded-full overflow-hidden shrink-0 size-[24px] bg-[var(--color-plum)]">
-              <img src="/co-marketer-logo.gif" alt="Cori" className="size-full object-cover" />
+              <img src="/co-marketer-logo.gif" alt="Zeno" className="size-full object-cover" />
             </div>
           </div>
-          <span className="font-bold text-[16px] leading-[20px] text-[var(--color-ink)]" style={FONT}>Cori</span>
+          <span className="font-bold text-[16px] leading-[20px] text-[var(--color-ink)]" style={FONT}>Zeno</span>
           <span className="mx-[12px] h-[20px] w-px rounded-[2px] bg-[oklch(0_0_0_/_0.08)]" />
           <span className="text-[14px] font-medium text-[var(--color-slate)]" style={FONT}>Settings</span>
         </div>

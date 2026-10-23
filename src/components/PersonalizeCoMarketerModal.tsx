@@ -126,7 +126,7 @@ const STEPS: StepDef[] = [
     continueLabel: 'Continue',
   },
   {
-    title: 'How should Cori help you?',
+    title: 'How should Zeno help you?',
     hint: () => 'Select all that apply',
     options: AI_PREFERENCE_OPTIONS,
     continueLabel: 'Save preferences',
@@ -414,7 +414,7 @@ const PersonalizeCoMarketerModal: React.FC<PersonalizeCoMarketerModalProps> = ({
             <div className="flex flex-col gap-[20px] px-[36px] pb-[32px] pt-[26px]">
               <div className="flex flex-col gap-[10px]">
                 <p className="text-[26px] font-semibold leading-[34px] text-[#17173A]" style={FONT}>
-                  Help Cori understand you better
+                  Help Zeno understand you better
                 </p>
                 <p className="text-[14px] leading-[22px] text-[#6F6F8D]" style={FONT}>
                   Four quick questions — your role, goals, metrics, and how you like to work —

@@ -7,10 +7,10 @@ import type { AudienceDraftView } from "@/data/audienceAgentFlow";
 const SHOW_WHY = false;
 
 /**
- * The segment Cori has drafted, in the same shape as its audience-cut cards:
+ * The segment Zeno has drafted, in the same shape as its audience-cut cards:
  * name and status up top, the rule in a line, the two numbers a marketer
  * decides on, why this cut suits the goal, and the rules behind it tucked under
- * "Rules & signals". Lives in the Cori chat, under the message that built it —
+ * "Rules & signals". Lives in the Zeno chat, under the message that built it —
  * a first draft, then the refined one.
  */
 export default function AudienceDraftCard({ draft }: { draft: AudienceDraftView }) {

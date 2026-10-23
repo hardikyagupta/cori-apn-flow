@@ -96,7 +96,7 @@ const EMPTY_PLATFORM: PlatformConfig = {
   soundFile: "",
 };
 
-/** Has the marketer (or Cori) written anything into the notification yet? */
+/** Has the marketer (or Zeno) written anything into the notification yet? */
 export function hasDraftContent(d: RegularLayoutDraft): boolean {
   return d.title.trim() !== "" || d.message.trim() !== "";
 }
