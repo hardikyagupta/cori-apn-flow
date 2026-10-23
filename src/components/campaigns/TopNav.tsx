@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Search, Plus, Bell } from "lucide-react";
 import trending from "/campaign-assets/ic-trending.svg";
 import CoMarketerNudge from "./CoMarketerNudge";
@@ -19,6 +20,19 @@ const CREATION_CHANNELS = new Set([
   "In-app Message",
   "Web Message",
 ]);
+
+/** Each wizard has its own address — /campaigns/email, /campaigns/app-push, … —
+ *  so it can be linked to and reloaded straight into. */
+const CHANNEL_SLUGS: Record<string, string> = {
+  Email: "email",
+  SMS: "sms",
+  Whatsapp: "whatsapp",
+  "App Push Notification": "app-push",
+  "Web Push Notification": "web-push",
+  "In-app Message": "in-app-message",
+  "Web Message": "web-message",
+};
+const CHANNEL_BY_SLUG = Object.fromEntries(Object.entries(CHANNEL_SLUGS).map(([ch, slug]) => [slug, ch]));
 
 /** Top application bar — 56px, white, rounded, soft card shadow. */
 export default function TopNav({
@@ -59,7 +73,14 @@ export default function TopNav({
   // works from every surface that renders this bar. `flowChannel` is kept while
   // the overlay slides away so its navbar doesn't blank out mid-exit.
   const [flowChannel, setFlowChannel] = useState<string | null>(null);
-  const [flowOpen, setFlowOpen] = useState(false);
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
+  // The wizard is open whenever the address is /campaigns/<channel>.
+  const routeChannel = CHANNEL_BY_SLUG[pathname.replace(/^\/campaigns\//, "")] as string | undefined;
+  const flowOpen = pathname.startsWith("/campaigns/") && Boolean(routeChannel);
+  useEffect(() => {
+    if (routeChannel) setFlowChannel(routeChannel);
+  }, [routeChannel]);
   // Segment creation shares the same treatment — quick-create → Segment opens a
   // blank canvas, the same one "Review segment" opens with rules already on it.
   const [segmentFlowOpen, setSegmentFlowOpen] = useState(false);
@@ -157,8 +178,7 @@ export default function TopNav({
                 // Messaging channels open the wizard here; anything else
                 // (Journey, Content) is left to the host page to route.
                 if (CREATION_CHANNELS.has(item)) {
-                  setFlowChannel(item);
-                  setFlowOpen(true);
+                  navigate(`/campaigns/${CHANNEL_SLUGS[item]}`);
                 } else if (item === "Segment") {
                   setSegmentFlowOpen(true);
                 }
@@ -224,8 +244,8 @@ export default function TopNav({
       {createPortal(
         <CampaignCreationOverlay
           open={flowOpen}
-          channel={flowChannel ?? "Email"}
-          onClose={() => setFlowOpen(false)}
+          channel={routeChannel ?? flowChannel ?? "Email"}
+          onClose={() => navigate("/campaigns")}
           onLaunched={onCampaignLaunched}
         />,
         document.body

@@ -46,6 +46,8 @@ const App = () => (
               <Route path="/agents" element={<Agents />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/campaigns" element={<Campaigns />} />
+              {/* /campaigns/email, /campaigns/app-push, … open that creation wizard. */}
+              <Route path="/campaigns/:channel" element={<Campaigns />} />
               <Route path="/audience/segments" element={<AudienceSegments />} />
               <Route path="/analytics/funnel" element={<AnalyticsFunnel />} />
               <Route path="/content/products" element={<Products />} />
