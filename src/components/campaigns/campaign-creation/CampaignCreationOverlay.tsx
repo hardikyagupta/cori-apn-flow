@@ -107,7 +107,7 @@ import { describeApprovalAnswers } from "@/data/approvalTranscript";
 import type { AudienceAgentHost, AudienceDraft } from "@/data/audienceAgentFlow";
 import StepCard from "./StepCard";
 import { CONSUMER_APPS } from "./pushAIScenarios.data";
-import { PUSH_CONTENT_CTA, type PushCampaignPrefill } from "@/data/pushCartFlow";
+import { PUSH_AUDIENCE_CTA, PUSH_CONTENT_CTA, type PushCampaignPrefill } from "@/data/pushCartFlow";
 import ChatInterface, {
   type SeededTopic,
   type StarterChip,
@@ -1643,12 +1643,38 @@ export default function CampaignCreationOverlay({
               }));
             }
             setCoriMade((m) => ({ ...m, audience: card.audienceScope !== "exclusions" || m.audience }));
-            if (previewOpen) setFocusAudienceKey((k) => k + 1);
+            if (previewOpen) {
+              setFocusAudienceKey((k) => k + 1);
+            } else if (isPushChannel && PUSH_STEPS[stepIndex]?.id !== "audience") {
+              // Applied from another step (e.g. the Schedule audit): confirm in
+              // the chat and offer the way to the Audience step to see it.
+              setFollowUpTopic({
+                prompt: "",
+                suppressPromptTurn: true,
+                navLabel: "Audience",
+                reply: "Audience applied successfully.",
+                setupApplyCard: {
+                  kind: "cta",
+                  title: PUSH_AUDIENCE_CTA,
+                  applyLabel: "Go to audience",
+                  appliedLabel: "Opening Audience",
+                },
+              });
+              setFollowUpSeq((n) => n + 1);
+            }
             return;
           }
           // App Push review: a change to the notification being drafted.
           if (card.pushDraftPatch) {
             setPushDraft((d) => ({ ...d, ...card.pushDraftPatch }));
+            return;
+          }
+          // App Push: Cori's hand-back to the Audience step after a review change.
+          if (card.kind === "cta" && card.title === PUSH_AUDIENCE_CTA) {
+            const to = PUSH_STEPS.findIndex((st) => st.id === "audience");
+            setStepIndex(to);
+            setReachedIndex((r) => Math.max(r, to));
+            canvasRef.current?.scrollTo({ top: 0 });
             return;
           }
           // App Push: Cori's hand-off from Audience to the Content step.

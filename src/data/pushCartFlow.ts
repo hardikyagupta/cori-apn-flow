@@ -37,6 +37,8 @@ export function isCartReminderPrompt(message: string): boolean {
 
 /** Title of the card that sends the marketer from Audience on to Content. */
 export const PUSH_CONTENT_CTA = "Write the notification";
+/** Cori's hand-back to the Audience step after a review finding changed it. */
+export const PUSH_AUDIENCE_CTA = "Review the audience";
 
 /** v1 of the cart reminder Cori writes on the Content step. */
 export const CART_REMINDER_V1 = {
