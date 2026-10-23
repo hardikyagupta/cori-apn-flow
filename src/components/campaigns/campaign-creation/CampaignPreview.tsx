@@ -5,6 +5,7 @@ import {
   Pencil,
   RefreshCw,
   Settings,
+  ShieldCheck,
   UserCheck,
   Users,
   X,
@@ -107,6 +108,7 @@ export default function CampaignPreview({
   aiMade,
   onClose,
   setupEditStep,
+  focusAudienceKey,
 }: {
   campaignId: string;
   campaignName: string;
@@ -140,9 +142,12 @@ export default function CampaignPreview({
   onClose?: () => void;
   /** Which step the Setup card's EDIT opens — the stepper has its own Setup. */
   setupEditStep?: string;
+  /** Bumps when the audience was just changed from the chat — scroll to it. */
+  focusAudienceKey?: number;
 }) {
   const [previewEmail, setPreviewEmail] = useState("");
   const [refreshing, setRefreshing] = useState(false);
+  const [nudgeOpen, setNudgeOpen] = useState(true);
   const isPush = channel === "App Push Notification";
   const [pushOs, setPushOs] = useState<"ios" | "android">("ios");
   const [pushLayout, setPushLayout] = useState<"expanded" | "collapsed">("expanded");
@@ -239,17 +244,75 @@ export default function CampaignPreview({
           Preview of {name}
         </h1>
         {onAskCoMarketer ? (
-        <button
-          type="button"
-          onClick={onAskCoMarketer}
-          className="relative z-[1] ml-auto flex h-8 items-center gap-1.5 overflow-hidden rounded-lg bg-white px-2.5 transition-shadow hover:shadow-sm"
-        >
-          <span aria-hidden="true" className="snake-border" />
-          <img src={navSparkle} alt="" className="relative z-[1] h-5 w-5" />
-          <span className="relative z-[1] font-manrope text-xs font-semibold tracking-[0.42px] text-ash">
-            {isPush ? "Audit the campaign with Cori" : "Ask Cori"}
-          </span>
-        </button>
+          <div className="relative ml-auto">
+            <button
+              type="button"
+              onClick={() => {
+                setNudgeOpen(false);
+                onAskCoMarketer();
+              }}
+              className="relative z-[1] flex h-8 items-center gap-1.5 overflow-hidden rounded-lg bg-white px-2.5 transition-shadow hover:shadow-sm"
+            >
+              <span aria-hidden="true" className="snake-border" />
+              <img src={navSparkle} alt="" className="relative z-[1] h-5 w-5" />
+              <span className="relative z-[1] font-manrope text-xs font-semibold tracking-[0.42px] text-ash">
+                {isPush ? "Audit the campaign with Cori" : "Ask Cori"}
+              </span>
+            </button>
+            {isPush && !chatOpen && nudgeOpen && (
+              <div
+                role="dialog"
+                aria-label="Audit the campaign"
+                className="absolute right-0 top-[calc(100%+12px)] z-50 animate-in fade-in slide-in-from-top-2 duration-500"
+              >
+                {/* Pointer — fill matches the banner behind it, so it reads as
+                    part of the card edge (same treatment as the discovery tour). */}
+                <span
+                  aria-hidden="true"
+                  className="absolute -top-[6px] right-[56px] z-10 h-3 w-3 rotate-45 border-l border-t border-[#DDE2EE] bg-[#EAF0FF]"
+                />
+                <div className="relative w-[320px] overflow-hidden rounded-[8px] border border-solid border-[#DDE2EE] bg-white shadow-[5px_5px_10px_0px_#E5E9F2]">
+                  <button
+                    type="button"
+                    aria-label="Dismiss"
+                    onClick={() => setNudgeOpen(false)}
+                    className="absolute right-2 top-2 z-10 grid h-6 w-6 place-items-center rounded-full border border-[#DDE2EE] bg-white text-[#17173A] shadow-sm transition-colors hover:bg-[#F4F8FF]"
+                  >
+                    <X className="h-3.5 w-3.5" strokeWidth={2} />
+                  </button>
+
+                  <div className="relative grid h-[120px] w-full place-items-center bg-[#EAF0FF]">
+                    <span className="absolute h-16 w-16 rounded-full bg-[#C9D8FA]" />
+                    <span className="relative grid h-14 w-14 place-items-center rounded-full bg-gradient-to-b from-[#6F9BF0] to-[#2F68E5] shadow-[0px_8px_20px_rgba(47,104,229,0.35)]">
+                      <ShieldCheck className="h-7 w-7 text-white" strokeWidth={1.8} />
+                    </span>
+                  </div>
+
+                  <div className="flex flex-col gap-1 p-4 pb-3">
+                    <span className="whitespace-nowrap font-manrope text-[14px] font-semibold leading-[20px] text-[#17173A]">
+                      Give your campaign a quick check ✅
+                    </span>
+                    <p className="font-manrope text-[13px] font-medium leading-[20px] text-[#6F6F8D]">
+                      Let Cori review your campaign for potential issues and suggest improvements before you publish.
+                    </p>
+                  </div>
+
+                  <div className="flex justify-end px-4 pb-4">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setNudgeOpen(false);
+                        onAskCoMarketer();
+                      }}
+                      className="dc-btn dc-btn-primary"
+                    >
+                      Audit campaign
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         ) : (
           <span className="ml-auto" />
         )}
@@ -287,6 +350,7 @@ export default function CampaignPreview({
               pushDetails={pushDetails}
               customDraft={customDraft}
               onEditStep={onEditStep}
+              focusAudienceKey={focusAudienceKey}
             />
             </div>
             {reviewAside}

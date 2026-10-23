@@ -178,6 +178,10 @@ function ContentCard({
   );
 }
 
+/** Parked for now: the brief's Rich media row and its "Make changes with Cori" CTA. */
+const SHOW_BRIEF_RICH_MEDIA = false;
+const SHOW_BRIEF_CHANGES = false;
+
 function BriefRow({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex gap-3 py-2">
@@ -189,6 +193,7 @@ function BriefRow({ label, children }: { label: string; children: ReactNode }) {
 
 function BriefCard({ draft, onEvent }: { draft: PushCartDraft; onEvent: (e: PushFlowEvent) => void }) {
   const [acted, setActed] = useState(false);
+  const [saved, setSaved] = useState(false);
   return (
     <div className="w-full overflow-hidden rounded-lg border border-[#DDE2EE] bg-white">
       <div className="border-b border-[#E8ECF4] px-4 py-3">
@@ -205,10 +210,12 @@ function BriefCard({ draft, onEvent }: { draft: PushCartDraft; onEvent: (e: Push
           <span className="block font-normal">{draft.body}</span>
           {draft.promoCode && <span className="block text-[12px] font-normal text-[#6F6F8D]">Promo code: {draft.promoCode}</span>}
         </BriefRow>
-        <BriefRow label="Rich media">
-          {draft.richMedia ? "Shopping cart image" : "None"}
-          {draft.countdown ? ` · Countdown ${COUNTDOWN_PREVIEW}` : ""}
-        </BriefRow>
+        {SHOW_BRIEF_RICH_MEDIA && (
+          <BriefRow label="Rich media">
+            {draft.richMedia ? "Shopping cart image" : "None"}
+            {draft.countdown ? ` · Countdown ${COUNTDOWN_PREVIEW}` : ""}
+          </BriefRow>
+        )}
         <BriefRow label="Template">
           {PUSH_CART_TEMPLATE_NAME} · ID {PUSH_CART_TEMPLATE_ID}
         </BriefRow>
@@ -217,17 +224,59 @@ function BriefCard({ draft, onEvent }: { draft: PushCartDraft; onEvent: (e: Push
         </BriefRow>
       </div>
       <div className="flex flex-wrap items-center gap-2 border-t border-[#E8ECF4] px-4 py-3">
-        <button
-          type="button"
-          className="dc-btn dc-btn-secondary"
-          disabled={acted}
-          onClick={() => {
-            setActed(true);
-            onEvent({ type: "changes" });
-          }}
-        >
-          Make changes with Cori
-        </button>
+        {SHOW_BRIEF_CHANGES && (
+          <button
+            type="button"
+            className="dc-btn dc-btn-secondary"
+            disabled={acted}
+            onClick={() => {
+              setActed(true);
+              onEvent({ type: "changes" });
+            }}
+          >
+            Make changes with Cori
+          </button>
+        )}
+        {saved ? (
+          <p className="flex items-center gap-2 font-manrope text-[13px] font-semibold text-[#17173A]">
+            <Check className="size-4 text-[#00A676]" strokeWidth={2.4} />
+            Campaign saved
+          </p>
+        ) : (
+          <button
+            type="button"
+            className="dc-btn dc-btn-primary"
+            onClick={() => {
+              setSaved(true);
+              onEvent({ type: "save", draft });
+            }}
+          >
+            Save campaign
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SavedCard({
+  draft,
+  campaignName,
+  campaignId,
+  onEvent,
+}: {
+  draft: PushCartDraft;
+  campaignName: string;
+  campaignId: string;
+  onEvent: (e: PushFlowEvent) => void;
+}) {
+  return (
+    <div className="w-full overflow-hidden rounded-lg border border-[#DDE2EE] bg-white">
+      <div className="px-4 py-3">
+        <p className="font-manrope text-[13px] font-semibold text-[#17173A]">{campaignName}</p>
+        <p className="font-manrope text-[12px] text-[#6F6F8D]">ID {campaignId}</p>
+      </div>
+      <div className="border-t border-[#E8ECF4] px-4 py-3">
         <button type="button" className="dc-btn dc-btn-primary" onClick={() => onEvent({ type: "preview", draft })}>
           Preview campaign
         </button>
@@ -271,5 +320,7 @@ export default function PushFlowCardView({
         onUse={(variation, withImage) => onEvent({ type: "useVariation", variation, withImage })}
       />
     );
+  if (card.kind === "saved")
+    return <SavedCard draft={card.draft} campaignName={card.campaignName} campaignId={card.campaignId} onEvent={onEvent} />;
   return <BriefCard draft={card.draft} onEvent={onEvent} />;
 }

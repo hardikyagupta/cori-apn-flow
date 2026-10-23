@@ -53,6 +53,8 @@ import {
   namedChannel,
   CHANNEL_QUESTIONS,
   CHANNEL_RECOMMENDATION,
+  CHANNEL_RECOMMENDATION_STATEMENT,
+  SHOW_CHANNEL_QUESTION,
   CHANNEL_YES,
   DISCOUNT_OBJECTIVE,
   FIRST_DRAFT_TITLE,
@@ -2861,8 +2863,10 @@ The content has been updated across all channels to reflect your changes.`;
     }, 80);
     playCoriReply(
       {
-        content: CHANNEL_RECOMMENDATION,
-        pushFlowCard: { kind: 'questions', stage: 0, questions: CHANNEL_QUESTIONS },
+        content: SHOW_CHANNEL_QUESTION ? CHANNEL_RECOMMENDATION : CHANNEL_RECOMMENDATION_STATEMENT,
+        pushFlowCard: SHOW_CHANNEL_QUESTION
+          ? { kind: 'questions', stage: 0, questions: CHANNEL_QUESTIONS }
+          : { kind: 'questions', stage: 1, questions: STAGE_ONE_QUESTIONS },
       },
       ['Comparing how each channel performed over the last 30 days to find the best fit for re-engaging shoppers who left items in their cart'],
       3,
@@ -3123,6 +3127,20 @@ The content has been updated across all channels to reflect your changes.`;
         ['Analyzing purchase and engagement patterns to identify valuable customer segments and recommend a discount that balances conversion potential and profitability'],
         2,
         PUSH_LOADER_LABELS.delivery,
+      );
+      return;
+    }
+    if (event.type === 'save') {
+      const campaignName = prefillFrom(event.draft, flow.apps).campaignName;
+      const campaignId = String(33000 + Math.floor(Math.random() * 900));
+      playCoriReply(
+        {
+          content: 'Your campaign is saved.',
+          pushFlowCard: { kind: 'saved', draft: event.draft, campaignName, campaignId },
+        },
+        undefined,
+        2,
+        PUSH_LOADER_LABELS.reply,
       );
       return;
     }
