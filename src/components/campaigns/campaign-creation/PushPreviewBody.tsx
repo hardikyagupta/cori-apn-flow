@@ -1,5 +1,5 @@
-import { useState, type ReactNode } from "react";
-import { Pencil, RefreshCw, Settings, UserCheck, Users, LayoutTemplate, Clock } from "lucide-react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Pencil, RefreshCw, Settings, Sparkles, UserCheck, Users, LayoutTemplate, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PlatformIcon } from "./PlatformIcons";
 import { APP_OPTIONS } from "./appOptions.data";
@@ -14,6 +14,16 @@ import { AndroidPreview, IosPreview, hasDraftContent, type RegularLayoutDraft } 
 
 const nf = new Intl.NumberFormat("en-US");
 
+/** A segment Cori built: sparkle, then its name — read-only here. */
+function AiSegmentPill({ name }: { name: string }) {
+  return (
+    <span className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-[#DDE2EE] bg-white px-3 py-1.5 font-manrope text-sm font-medium text-[#17173A]">
+      <Sparkles className="size-3.5 shrink-0 text-[#7B5CFA]" strokeWidth={2.2} />
+      <span className="truncate">{name}</span>
+    </span>
+  );
+}
+
 /** A section card — muted icon + title on a ruled header, EDIT on the right. */
 function Section({
   icon: Icon,
@@ -21,15 +31,27 @@ function Section({
   onEdit,
   action,
   children,
+  sectionRef,
+  flash = false,
 }: {
   icon: typeof Settings;
   title: string;
   onEdit: () => void;
   action?: ReactNode;
   children: ReactNode;
+  /** For scrolling the card into view. */
+  sectionRef?: React.Ref<HTMLElement>;
+  /** Briefly ring the card to draw the eye to it. */
+  flash?: boolean;
 }) {
   return (
-    <section className="overflow-hidden rounded-lg bg-white shadow-[0_1px_6px_rgba(23,23,58,0.08)]">
+    <section
+      ref={sectionRef}
+      className={cn(
+        "overflow-hidden rounded-lg bg-white shadow-[0_1px_6px_rgba(23,23,58,0.08)] transition-shadow duration-500",
+        flash && "shadow-[0_0_0_2px_#2F68E5,0_4px_16px_rgba(47,104,229,0.25)]"
+      )}
+    >
       <header className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-[#EEF1F7] px-6 py-4">
         <Icon className="size-[18px] shrink-0 text-[#6F6F8D]" strokeWidth={2} />
         <h2 className="font-manrope text-base font-bold text-[#4A4A68]">{title}</h2>
@@ -79,6 +101,7 @@ export default function PushPreviewBody({
   pushDetails,
   customDraft,
   onEditStep,
+  focusAudienceKey = 0,
 }: {
   campaignId: string;
   campaignName: string;
@@ -90,10 +113,24 @@ export default function PushPreviewBody({
   /** The Regular layout notification written on the Content step, if any. */
   customDraft?: RegularLayoutDraft;
   onEditStep: (stepId: string) => void;
+  /** Bumps when the audience was just changed from the chat. */
+  focusAudienceKey?: number;
 }) {
   const [refreshing, setRefreshing] = useState(false);
   const apps = APP_OPTIONS.filter((a) => audience.selectedApps.includes(a.id));
   const platforms = (["ios", "android"] as const).filter((p) => apps.some((a) => a.platform === p));
+  // A new key means the audience just changed from the chat: scroll to its
+  // card and ring it for a moment so the change is noticed.
+  const audienceRef = useRef<HTMLElement>(null);
+  const [audienceFlash, setAudienceFlash] = useState(false);
+  useEffect(() => {
+    if (!focusAudienceKey) return;
+    audienceRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    setAudienceFlash(true);
+    const id = window.setTimeout(() => setAudienceFlash(false), 2200);
+    return () => window.clearTimeout(id);
+  }, [focusAudienceKey]);
+
   const [os, setOs] = useState<"ios" | "android">(platforms[0] ?? "ios");
   const [layout, setLayout] = useState<"expanded" | "collapsed">("expanded");
   const tags = parseTags(setup.tags);
@@ -205,6 +242,8 @@ export default function PushPreviewBody({
         <Section
           icon={Users}
           title="Audience"
+          sectionRef={audienceRef}
+          flash={audienceFlash}
           onEdit={() => onEditStep("audience")}
           action={
             <div className="flex h-8 shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-[#DDE2EE] bg-white pl-2 pr-3">
@@ -226,7 +265,24 @@ export default function PushPreviewBody({
           }
         >
           <SubHeading>Selected contacts</SubHeading>
-          <p className="font-manrope text-sm font-medium leading-6 text-[#17173A]">{audienceSummary}</p>
+          {audience.mode === "segments" && audience.segments.some((sg) => sg.ai) ? (
+            <div className="flex flex-wrap gap-2 py-1">
+              {audience.segments.map((sg) =>
+                sg.ai ? (
+                  <AiSegmentPill key={sg.id} name={sg.name} />
+                ) : (
+                  <span
+                    key={sg.id}
+                    className="rounded-full border border-[#DDE2EE] bg-white px-3 py-1.5 font-manrope text-sm font-medium text-[#17173A]"
+                  >
+                    {sg.name}
+                  </span>
+                )
+              )}
+            </div>
+          ) : (
+            <p className="font-manrope text-sm font-medium leading-6 text-[#17173A]">{audienceSummary}</p>
+          )}
           <div className="mt-4">
             <Row label="Device targeting:">
               {audience.deviceTargeting === "latest" ? "Latest active device only" : "All active devices"}
@@ -238,14 +294,18 @@ export default function PushPreviewBody({
           {audience.excludeEnabled && audience.excludeSegments.length ? (
             <Row label="Exclude list/segment:">
               <div className="flex flex-wrap gap-1.5">
-                {audience.excludeSegments.map((s) => (
-                  <span
-                    key={s.id}
-                    className="rounded-full bg-[#6B6B8E] px-3 py-1 font-manrope text-[13px] font-medium text-white"
-                  >
-                    {s.name}
-                  </span>
-                ))}
+                {audience.excludeSegments.map((s) =>
+                  s.ai ? (
+                    <AiSegmentPill key={s.id} name={s.name} />
+                  ) : (
+                    <span
+                      key={s.id}
+                      className="rounded-full bg-[#6B6B8E] px-3 py-1 font-manrope text-[13px] font-medium text-white"
+                    >
+                      {s.name}
+                    </span>
+                  )
+                )}
               </div>
             </Row>
           ) : (

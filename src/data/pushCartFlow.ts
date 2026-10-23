@@ -259,6 +259,18 @@ export const CHANNEL_EXPLORE = "Explore other channels";
 export const CHANNEL_RECOMMENDATION =
   "App Push has delivered a 24% higher engagement rate than your other channels over the last 30 days, making it a strong choice to re-engage shoppers who haven't completed their purchase. Would you like to use it for this campaign?";
 
+/**
+ * Parked for now: Cori only builds App Push campaigns, so it no longer asks
+ * whether to use App Push — it says why it fits and moves on to the audience.
+ * Flip to true to ask "Would you like to use App Push?" again (the question,
+ * its follow-ups and the "Explore other channels" path are all still wired).
+ */
+export const SHOW_CHANNEL_QUESTION = false;
+
+/** The recommendation as said when the question is parked. */
+export const CHANNEL_RECOMMENDATION_STATEMENT =
+  "App Push has delivered a 24% higher engagement rate than your other channels over the last 30 days, making it a strong choice to re-engage shoppers who haven't completed their purchase.\n\nLet's identify the right audience for this campaign.";
+
 export const CHANNEL_QUESTIONS: FlowQuestion[] = [
   {
     id: "channel",
@@ -511,11 +523,15 @@ export type PushFlowEvent =
   | { type: "useVariation"; variation: PushVariation; withImage: boolean }
   | { type: "content"; draft: PushCartDraft }
   | { type: "changes" }
+  /** "Save campaign" on the brief. */
+  | { type: "save"; draft: PushCartDraft }
   | { type: "preview"; draft: PushCartDraft };
 
 export type PushFlowCard =
   | { kind: "questions"; stage: number | string; questions: FlowQuestion[] }
   | { kind: "content"; draft: PushCartDraft; needsPromo: boolean; version?: number; superseded?: boolean }
   | { kind: "brief"; draft: PushCartDraft }
+  /** The follow-up once the brief is saved: name, ID and a way into the preview. */
+  | { kind: "saved"; draft: PushCartDraft; campaignName: string; campaignId: string }
   | { kind: "audience"; draft: AudienceDraftView }
   | { kind: "variations"; variations: PushVariation[] };

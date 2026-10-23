@@ -16,6 +16,7 @@ export default function PushCampaignNavbar({
   isLastStep,
   onRenameCampaign,
   onAskCoMarketer,
+  askLabel = "Ask Cori",
   onNext,
   onClose,
 }: {
@@ -26,6 +27,8 @@ export default function PushCampaignNavbar({
   onRenameCampaign: (name: string) => void;
   /** Omit to hide the Ask Cori button. */
   onAskCoMarketer?: () => void;
+  /** The Cori button's label — "Audit the campaign with Cori" on the last step. */
+  askLabel?: string;
   onNext: () => void;
   onClose: () => void;
 }) {
@@ -56,7 +59,7 @@ export default function PushCampaignNavbar({
           <span aria-hidden="true" className="snake-border" />
           <img src={sparkle} alt="" className="relative z-[1] h-5 w-5" />
           <span className="relative z-[1] font-manrope text-xs font-semibold tracking-[0.42px] text-ash">
-            Ask Cori
+            {askLabel}
           </span>
         </button>
         )}

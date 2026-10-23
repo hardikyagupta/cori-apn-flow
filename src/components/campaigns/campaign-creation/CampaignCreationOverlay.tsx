@@ -533,6 +533,8 @@ export default function CampaignCreationOverlay({
   // Preview is the screen after the last step, not a fifth step — it replaces
   // the wizard chrome with its own header while the draft stays in state.
   const [previewOpen, setPreviewOpen] = useState(false);
+  // Bumped when an audience is applied from the preview, so the preview scrolls to it.
+  const [focusAudienceKey, setFocusAudienceKey] = useState(0);
   // App Push's stepper: which step is showing, and the furthest one reached.
   // The Segment agent's questions, drawn above the chat composer until answered.
   const [goalApprovalOpen, setGoalApprovalOpen] = useState(false);
@@ -809,6 +811,15 @@ export default function CampaignCreationOverlay({
     setChatSession((n) => n + 1);
     setChatOpen(true);
   }, [pushWizardStep]);
+
+  // App Push: the preview opens without Cori docked — a nudge on the preview
+  // offers the audit instead. (Kept above the `mounted` early return so the hook
+  // order never changes between renders.)
+  const wasPreviewOpen = useRef(false);
+  useEffect(() => {
+    if (previewOpen && !wasPreviewOpen.current && channel === "App Push Notification") setChatOpen(false);
+    wasPreviewOpen.current = previewOpen;
+  }, [previewOpen, channel]);
 
   if (!mounted) return null;
 
@@ -1632,6 +1643,7 @@ export default function CampaignCreationOverlay({
               }));
             }
             setCoriMade((m) => ({ ...m, audience: card.audienceScope !== "exclusions" || m.audience }));
+            if (previewOpen) setFocusAudienceKey((k) => k + 1);
             return;
           }
           // App Push review: a change to the notification being drafted.
@@ -1844,6 +1856,7 @@ export default function CampaignCreationOverlay({
           }
           onAskFinding={(finding) => openTopic(findingTopic(finding))}
           chatOpen={chatOpen}
+          focusAudienceKey={focusAudienceKey}
           chatSlot={chatColumn}
           channel={channel}
           pushDetails={prefill?.details}
@@ -1859,7 +1872,14 @@ export default function CampaignCreationOverlay({
             icon={Icon}
             isLastStep={stepIndex === PUSH_STEPS.length - 1}
             onRenameCampaign={renameCampaign}
-            onAskCoMarketer={isPushChannel || SHOW_EMAIL_CORI ? openFreshChat : undefined}
+            onAskCoMarketer={
+              isPushChannel && stepIndex === PUSH_STEPS.length - 1
+                ? handleAuditCampaign
+                : isPushChannel || SHOW_EMAIL_CORI
+                  ? openFreshChat
+                  : undefined
+            }
+            askLabel={isPushChannel && stepIndex === PUSH_STEPS.length - 1 ? "Audit the campaign with Cori" : undefined}
             onNext={goNextPushStep}
             onClose={onClose}
           />
