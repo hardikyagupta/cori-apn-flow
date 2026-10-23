@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Check, ChevronLeft, ChevronRight, Info, Lightbulb, Plus, ThumbsUp, Upload, X } from "lucide-react";
+import { Check, ChevronDown, Info, Lightbulb, Plus, ThumbsUp, Upload, X } from "lucide-react";
 import { RECENTLY_USED_TEST_EMAILS, TEST_CONTACT_COLUMNS, contactsFor } from "./testRecipients.data";
 import { cn } from "@/lib/utils";
 
@@ -17,6 +17,80 @@ const MAX_TEST_LIST_USERS = 100;
 
 /** Parked for now: the "N of M selected" line under the contact table. */
 const SHOW_SELECTED_COUNT = false;
+
+/** Parked for now: the "· N IDs" count beside the email address being reviewed. */
+const SHOW_ID_COUNT = false;
+
+/** Dropdown over the addresses that have several IDs — picking one shows that address's contacts below. */
+function EmailSwitcher({
+  emails,
+  value,
+  onChange,
+}: {
+  emails: string[];
+  value: string;
+  onChange: (index: number) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (!wrapRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [open]);
+
+  return (
+    <div ref={wrapRef} className="relative inline-block">
+      <button
+        type="button"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+        className={cn(
+          "flex items-center gap-2 rounded border bg-white py-1.5 pl-3 pr-2.5 font-manrope text-sm font-semibold text-[#17173A] transition-colors",
+          open ? "border-[#2F68E5]" : "border-[#DDE2EE] hover:border-[#C3CAD9]"
+        )}
+      >
+        {value}
+        <ChevronDown
+          className={cn("size-4 text-[#6F6F8D] transition-transform", open && "rotate-180")}
+          strokeWidth={2.2}
+        />
+      </button>
+      {open && (
+        <div
+          role="listbox"
+          className="absolute left-0 top-full z-20 mt-1 min-w-full overflow-hidden rounded border border-[#DDE2EE] bg-white py-1 shadow-[0_8px_24px_rgba(23,23,58,0.12)]"
+        >
+          {emails.map((e, i) => (
+            <button
+              key={e}
+              type="button"
+              role="option"
+              aria-selected={e === value}
+              onClick={() => {
+                onChange(i);
+                setOpen(false);
+              }}
+              className={cn(
+                "block w-full whitespace-nowrap border-l-[3px] px-4 py-2.5 text-left font-manrope text-sm font-semibold transition-colors",
+                e === value
+                  ? "border-[#2F68E5] bg-[#F4F8FF] text-[#17173A]"
+                  : "border-transparent text-[#6F6F8D] hover:bg-[#F4F8FF] hover:text-[#17173A]"
+              )}
+            >
+              {e}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function parseEmails(value: string): string[] {
   return value
@@ -371,7 +445,7 @@ export default function SendTestMailDrawer({
                   <div>
                     <p className="font-manrope text-sm font-bold text-[#17173A]">
                       {ambiguous.length > 1
-                        ? "We found multiple IDs for some email addresses"
+                        ? `We found multiple IDs for ${ambiguous.length} email addresses`
                         : `We found ${contactsFor(current).length} IDs linked to ${current}`}
                     </p>
                     <p className="mb-3 mt-1 font-manrope text-sm text-[#6F6F8D]">
@@ -380,40 +454,17 @@ export default function SendTestMailDrawer({
                         : "Select the attributes to include in the test email."}
                     </p>
                   </div>
-                  {ambiguous.length > 1 && (
-                    <div className="flex shrink-0 items-center gap-1 font-manrope text-sm font-semibold text-[#17173A]">
-                      <button
-                        type="button"
-                        aria-label="Previous email"
-                        disabled={pageIndex === 0}
-                        onClick={() => setPage(pageIndex - 1)}
-                        className="grid size-7 place-items-center rounded text-[#6F6F8D] transition-colors hover:bg-[#F0F3F9] disabled:opacity-30 disabled:hover:bg-transparent"
-                      >
-                        <ChevronLeft className="size-4" strokeWidth={2.2} />
-                      </button>
-                      <span className="min-w-[2.25rem] text-center tabular-nums">
-                        {pageIndex + 1}/{ambiguous.length}
-                      </span>
-                      <button
-                        type="button"
-                        aria-label="Next email"
-                        disabled={pageIndex === ambiguous.length - 1}
-                        onClick={() => setPage(pageIndex + 1)}
-                        className="grid size-7 place-items-center rounded text-[#6F6F8D] transition-colors hover:bg-[#F0F3F9] disabled:opacity-30 disabled:hover:bg-transparent"
-                      >
-                        <ChevronRight className="size-4" strokeWidth={2.2} />
-                      </button>
-                    </div>
-                  )}
                 </div>
 
                 {ambiguous.length > 1 && (
-                  <p className="mb-2 flex items-center gap-2 font-manrope text-sm font-semibold text-[#17173A]">
-                    {current}
-                    <span className="font-medium text-[#6F6F8D]">
-                      · {contactsFor(current).length} IDs
-                    </span>
-                  </p>
+                  <div className="mb-3 flex items-center gap-2">
+                    <EmailSwitcher emails={ambiguous} value={current} onChange={setPage} />
+                    {SHOW_ID_COUNT && (
+                      <span className="font-manrope text-sm font-medium text-[#6F6F8D]">
+                        · {contactsFor(current).length} IDs
+                      </span>
+                    )}
+                  </div>
                 )}
 
                 <div className="overflow-x-auto rounded-[4px] border border-[#DDE2EE] shadow-[0_5px_6px_rgba(23,23,58,0.07)]">
