@@ -1,10 +1,11 @@
 import { useState, type ReactNode } from "react";
-import { Check } from "lucide-react";
+import { Check, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
 import CoriQuestionsCard from "@/components/CoriQuestionsCard";
 import AudienceDraftCard from "@/components/campaigns/campaign-creation/AudienceDraftCard";
 import PushVariationsCard from "@/components/PushVariationsCard";
+import { AndroidIcon, AppleIcon } from "@/components/campaigns/campaign-creation/PlatformIcons";
 import { appPushTemplates } from "@/components/campaigns/campaign-creation/appPushTemplates.data";
 import {
   COUNTDOWN_PREVIEW,
@@ -32,21 +33,86 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
+type PreviewOS = "ios" | "android";
+
+/** A small two-option toggle, sized for a card header. */
+function MiniToggle<T extends string>({
+  options,
+  value,
+  onChange,
+  label,
+}: {
+  options: { value: T; label: string; icon?: (props: { className?: string }) => ReactNode }[];
+  value: T;
+  onChange: (v: T) => void;
+  label: string;
+}) {
+  return (
+    <div role="radiogroup" aria-label={label} className="inline-flex overflow-hidden rounded-md border border-[#DDE2EE] bg-white">
+      {options.map((o) => (
+        <button
+          key={o.value}
+          type="button"
+          role="radio"
+          aria-checked={value === o.value}
+          aria-label={o.label}
+          title={o.label}
+          onClick={() => onChange(o.value)}
+          className={cn(
+            "grid min-w-[32px] place-items-center px-2.5 py-1 font-manrope text-[12px] font-semibold transition-colors",
+            value === o.value ? "bg-[var(--btn-primary)] text-white" : "text-[#6F6F8D] hover:bg-[#F7F9FC] hover:text-[#17173A]"
+          )}
+        >
+          {o.icon ? <o.icon className="size-4" /> : o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 /** The Coupon Expiry Reminder layout (ID 80006) as a live notification — the
- *  cart image is cropped out of the template's own thumbnail. */
-function NotificationPreview({ draft }: { draft: PushCartDraft }) {
+ *  cart image is cropped out of the template's own thumbnail. Collapsed drops
+ *  the image; Android has its own header row and squarer corners. */
+function NotificationPreview({ draft, os, expanded }: { draft: PushCartDraft; os: PreviewOS; expanded: boolean }) {
+  const android = os === "android";
   return (
     <div className="rounded-xl bg-[#F4F8FF] p-3">
-      <div className="rounded-xl bg-white p-3 shadow-[0_1px_4px_rgba(23,23,58,0.12)]">
+      <div
+        className={cn(
+          "bg-white p-3 shadow-[0_1px_4px_rgba(23,23,58,0.12)]",
+          android ? "rounded-[10px]" : "rounded-xl"
+        )}
+      >
         <div className="flex items-center gap-2">
           <span className="grid size-5 place-items-center rounded-[5px] bg-[#E9D7C8] text-[9px] font-bold text-[#6B4A32]">P</span>
-          <p className="font-manrope text-[12px] text-[#17173A]">Pranaglow</p>
-          <p className="ml-auto font-manrope text-[11px] text-[#6F6F8D]">now</p>
+          {android ? (
+            <p className="font-manrope text-[12px] text-[#6F6F8D]">
+              <span className="text-[#17173A]">Pranaglow</span> · now
+            </p>
+          ) : (
+            <>
+              <p className="font-manrope text-[12px] text-[#17173A]">Pranaglow</p>
+              <p className="ml-auto font-manrope text-[11px] text-[#6F6F8D]">now</p>
+            </>
+          )}
+          {android && (
+            <ChevronDown
+              className={cn("ml-auto size-4 text-[#6F6F8D] transition-transform", expanded && "rotate-180")}
+              strokeWidth={2}
+            />
+          )}
         </div>
         <div className="mt-2 flex items-start gap-2">
           <div className="min-w-0 flex-1">
             <p className="truncate font-manrope text-[13px] font-bold text-[#17173A]">{resolvedTitle(draft) || "Title"}</p>
-            <p className="mt-0.5 line-clamp-2 font-manrope text-[12px] leading-snug text-[#17173A]">{draft.body || "Body"}</p>
+            <p
+              className={cn(
+                "mt-0.5 font-manrope text-[12px] leading-snug text-[#17173A]",
+                expanded ? "line-clamp-2" : "truncate"
+              )}
+            >
+              {draft.body || "Body"}
+            </p>
           </div>
           {draft.countdown && (
             <span className="shrink-0 rounded-md bg-[#FFD35C] px-2 py-1 font-manrope text-[12px] font-bold tabular-nums text-[#17173A]">
@@ -54,7 +120,7 @@ function NotificationPreview({ draft }: { draft: PushCartDraft }) {
             </span>
           )}
         </div>
-        {draft.richMedia && template && (
+        {expanded && draft.richMedia && template && (
           <div className="relative mt-2 w-full overflow-hidden rounded-md bg-black" style={{ aspectRatio: "549 / 198" }}>
             <img
               src={template.image}
@@ -88,6 +154,8 @@ function ContentCard({
 }) {
   const [draft, setDraft] = useState(initial);
   const [sent, setSent] = useState(false);
+  const [os, setOs] = useState<PreviewOS>("ios");
+  const [expanded, setExpanded] = useState(true);
   const confirmed = sent || Boolean(superseded);
   const set = <K extends keyof PushCartDraft>(key: K, value: PushCartDraft[K]) =>
     setDraft((d) => ({ ...d, [key]: value }));
@@ -95,17 +163,34 @@ function ContentCard({
 
   return (
     <div className="w-full overflow-hidden rounded-lg border border-[#DDE2EE] bg-white">
-      <div className="flex items-center justify-between gap-3 border-b border-[#E8ECF4] px-4 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-[#E8ECF4] px-4 py-3">
         <p className="font-manrope text-[15px] font-bold text-[#17173A]">
           Notification draft
           {version ? <span className="ml-2 font-semibold text-[#6F6F8D]">v{version}</span> : null}
         </p>
-        <span className="truncate rounded-full bg-[#F3F6FF] px-2.5 py-1 font-manrope text-[11px] font-semibold text-[#2F68E5]">
-          {PUSH_CART_TEMPLATE_NAME} · ID {PUSH_CART_TEMPLATE_ID}
-        </span>
+        <div className="flex items-center gap-2">
+          <MiniToggle
+            label="Platform"
+            options={[
+              { value: "ios", label: "iOS", icon: AppleIcon },
+              { value: "android", label: "Android", icon: AndroidIcon },
+            ]}
+            value={os}
+            onChange={(v) => setOs(v as PreviewOS)}
+          />
+          <MiniToggle
+            label="Notification state"
+            options={[
+              { value: "expanded", label: "Expanded" },
+              { value: "collapsed", label: "Collapsed" },
+            ]}
+            value={expanded ? "expanded" : "collapsed"}
+            onChange={(v) => setExpanded(v === "expanded")}
+          />
+        </div>
       </div>
       <div className="space-y-3 px-4 py-4">
-        <NotificationPreview draft={draft} />
+        <NotificationPreview draft={draft} os={os} expanded={expanded} />
         {SHOW_DRAFT_EDITING && (
           <>
             <Field label="Title">
