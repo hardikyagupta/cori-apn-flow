@@ -336,7 +336,11 @@ export default function CampaignPreview({
       </header>
 
       <div className={cn("flex min-h-0 flex-1 gap-5", chatOpen ? "pr-5" : "")}>
-        <div className="scroll-slim min-h-0 flex-1 overflow-y-auto px-14 py-6">
+        {/* With the chat docked the canvas drops its right padding: the flex gap
+            alone sits between the content and the chat, the same 20px as between
+            the cards, instead of 56px of padding on top of it. Its top padding is
+            the chat column's own 12px, so the cards and the chat start level. */}
+        <div className={cn("scroll-slim min-h-0 flex-1 overflow-y-auto", chatOpen && isPush ? "pb-6 pl-14 pr-0 pt-3" : "px-14 py-6")}>
           {isPush ? (
             <div className="flex items-start gap-5">
             <div className="min-w-0 flex-1">
@@ -351,6 +355,7 @@ export default function CampaignPreview({
               customDraft={customDraft}
               onEditStep={onEditStep}
               focusAudienceKey={focusAudienceKey}
+              compact={chatOpen}
             />
             </div>
             {reviewAside}

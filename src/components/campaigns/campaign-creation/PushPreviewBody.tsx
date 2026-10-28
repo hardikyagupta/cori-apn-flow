@@ -1,6 +1,8 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Pencil, RefreshCw, Settings, Sparkles, UserCheck, Users, LayoutTemplate, Clock } from "lucide-react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { Pencil, RefreshCw, Settings, Sparkles, Users, LayoutTemplate, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
+import * as TooltipPrimitive from "@radix-ui/react-tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { PlatformIcon } from "./PlatformIcons";
 import { APP_OPTIONS } from "./appOptions.data";
 import { appPushTemplates } from "./appPushTemplates.data";
@@ -24,17 +26,29 @@ function AiSegmentPill({ name }: { name: string }) {
   );
 }
 
-/** A section card — muted icon + title on a ruled header, EDIT on the right. */
+/** Each section's icon sits in its own colourful badge. */
+const SECTION_TONES = {
+  setup: "from-[#6FD08C] to-[#27A86B]",
+  audience: "from-[#6C8CFF] to-[#8F63F5]",
+  content: "from-[#27C7A5] to-[#2F8FE5]",
+  schedule: "from-[#FFAA5C] to-[#FF6B8E]",
+} as const;
+
+/** A section card — colourful icon badge + title on a ruled header, EDIT on the
+ *  right (just the pencil, with a tooltip, once the chat takes the room). */
 function Section({
   icon: Icon,
+  tone,
   title,
   onEdit,
   action,
   children,
   sectionRef,
   flash = false,
+  compact = false,
 }: {
   icon: typeof Settings;
+  tone: keyof typeof SECTION_TONES;
   title: string;
   onEdit: () => void;
   action?: ReactNode;
@@ -43,6 +57,8 @@ function Section({
   sectionRef?: React.Ref<HTMLElement>;
   /** Briefly ring the card to draw the eye to it. */
   flash?: boolean;
+  /** Icon-only Edit, so the header keeps to one tidy row beside the chat. */
+  compact?: boolean;
 }) {
   return (
     <section
@@ -52,20 +68,54 @@ function Section({
         flash && "shadow-[0_0_0_2px_#2F68E5,0_4px_16px_rgba(47,104,229,0.25)]"
       )}
     >
-      <header className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-[#EEF1F7] px-6 py-4">
-        <Icon className="size-[18px] shrink-0 text-[#6F6F8D]" strokeWidth={2} />
-        <h2 className="font-manrope text-base font-bold text-[#4A4A68]">{title}</h2>
-        <div className="ml-auto flex flex-wrap items-center justify-end gap-x-3 gap-y-2">
-          {action}
+      {/* One flex-wrap with a single gap, so when it does wrap the rows sit an
+          equal distance apart. */}
+      <header className="flex flex-wrap items-center gap-3 border-b border-[#EEF1F7] px-6 py-4">
+        <span className="flex items-center gap-3">
+          <span
+            className={cn(
+              "grid size-8 shrink-0 place-items-center rounded-full bg-gradient-to-br shadow-[0_2px_6px_rgba(23,23,58,0.18)]",
+              SECTION_TONES[tone]
+            )}
+          >
+            <Icon className="size-4 text-white" strokeWidth={2} />
+          </span>
+          <h2 className="font-manrope text-base font-bold text-[#4A4A68]">{title}</h2>
+        </span>
+        {action}
+        {compact ? (
+          <TooltipProvider delayDuration={150}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  aria-label={`Edit ${title}`}
+                  onClick={onEdit}
+                  className="ml-auto grid size-8 shrink-0 place-items-center rounded border border-[#DDE2EE] bg-white text-[#6F6F8D] transition-colors hover:bg-[#F7F9FC] hover:text-[#17173A]"
+                >
+                  <Pencil className="size-3.5" strokeWidth={2} />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent
+                side="top"
+                sideOffset={8}
+                className="overflow-visible rounded-lg border-0 bg-black px-3 py-1.5 text-white shadow-none"
+              >
+                <p className="font-manrope text-xs leading-[18px]">Edit</p>
+                <TooltipPrimitive.Arrow className="fill-black" width={10} height={6} />
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        ) : (
           <button
             type="button"
             onClick={onEdit}
-            className="flex h-8 shrink-0 items-center gap-1.5 rounded border border-[#DDE2EE] bg-white px-3 font-manrope text-xs font-semibold uppercase tracking-[0.42px] text-[#6F6F8D] transition-colors hover:bg-[#F7F9FC] hover:text-[#17173A]"
+            className="ml-auto flex h-8 shrink-0 items-center gap-1.5 rounded border border-[#DDE2EE] bg-white px-3 font-manrope text-xs font-semibold uppercase tracking-[0.42px] text-[#6F6F8D] transition-colors hover:bg-[#F7F9FC] hover:text-[#17173A]"
           >
             <Pencil className="size-3.5" strokeWidth={2} />
             Edit
           </button>
-        </div>
+        )}
       </header>
       <div className="px-6 py-5">{children}</div>
     </section>
@@ -102,6 +152,7 @@ export default function PushPreviewBody({
   customDraft,
   onEditStep,
   focusAudienceKey = 0,
+  compact = false,
 }: {
   campaignId: string;
   campaignName: string;
@@ -115,6 +166,8 @@ export default function PushPreviewBody({
   onEditStep: (stepId: string) => void;
   /** Bumps when the audience was just changed from the chat. */
   focusAudienceKey?: number;
+  /** The chat is docked beside the preview — icon-only Edit buttons. */
+  compact?: boolean;
 }) {
   const [refreshing, setRefreshing] = useState(false);
   const apps = APP_OPTIONS.filter((a) => audience.selectedApps.includes(a.id));
@@ -130,6 +183,26 @@ export default function PushPreviewBody({
     const id = window.setTimeout(() => setAudienceFlash(false), 2200);
     return () => window.clearTimeout(id);
   }, [focusAudienceKey]);
+
+  const contentWrapRef = useRef<HTMLDivElement>(null);
+  const [contentTop, setContentTop] = useState(24);
+  useLayoutEffect(() => {
+    const wrap = contentWrapRef.current;
+    if (!wrap) return;
+    let scroller: HTMLElement | null = wrap.parentElement;
+    while (scroller && !/(auto|scroll)/.test(getComputedStyle(scroller).overflowY)) scroller = scroller.parentElement;
+    const measure = () => {
+      const viewport = scroller ? scroller.clientHeight : window.innerHeight;
+      // Top-aligned while it fits; otherwise let it stick with its bottom edge
+      // 24px above the bottom of the view.
+      setContentTop(Math.min(24, viewport - wrap.offsetHeight - 24));
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(wrap);
+    if (scroller) ro.observe(scroller);
+    return () => ro.disconnect();
+  }, []);
 
   const [os, setOs] = useState<"ios" | "android">(platforms[0] ?? "ios");
   const [layout, setLayout] = useState<"expanded" | "collapsed">("expanded");
@@ -168,27 +241,32 @@ export default function PushPreviewBody({
   return (
     <div className="grid items-start gap-5 xl:grid-cols-[minmax(380px,2fr)_3fr]">
       <div className="flex flex-col gap-5">
-        <Section icon={Settings} title="Setup details" onEdit={() => onEditStep("setup")}>
+        <Section icon={Settings} tone="setup" compact={compact} title="Setup details" onEdit={() => onEditStep("setup")}>
           <SubHeading>Campaign details</SubHeading>
           <Row label="Campaign ID:">{campaignId}</Row>
           <Row label="Campaign name:">{campaignName}</Row>
-          <Row label="Select app(s):">
+          {/* Apps list under their label — beside it they left a wide empty gutter. */}
+          <div className="py-1.5">
+            <p className="font-manrope text-sm text-[#6F6F8D]">Select app(s):</p>
             {apps.length ? (
-              <div className="flex flex-wrap gap-1.5">
+              <div className="mt-2 flex flex-wrap gap-2">
                 {apps.map((a) => (
                   <span
                     key={a.id}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-[#DDE2EE] bg-white py-1 pl-2 pr-3 font-manrope text-[13px] font-medium text-[#17173A]"
+                    className="inline-flex items-center gap-1.5 rounded-full border border-[#DDE2EE] bg-white py-1 pl-2.5 pr-3 font-manrope text-[13px] font-medium text-[#17173A]"
                   >
-                    <PlatformIcon platform={a.platform} className="size-3.5" />
+                    <PlatformIcon
+                      platform={a.platform}
+                      className={cn("size-3.5", a.platform === "android" ? "text-[#3DDC84]" : "text-[#6F6F8D]")}
+                    />
                     {a.name}
                   </span>
                 ))}
               </div>
             ) : (
-              "—"
+              <p className="mt-1 font-manrope text-sm font-medium text-[#17173A]">—</p>
             )}
-          </Row>
+          </div>
           <Row label="Tags:">
             {tags.length ? (
               <div className="flex flex-wrap gap-1.5">
@@ -241,29 +319,28 @@ export default function PushPreviewBody({
 
         <Section
           icon={Users}
+          tone="audience"
+          compact={compact}
           title="Audience"
           sectionRef={audienceRef}
           flash={audienceFlash}
           onEdit={() => onEditStep("audience")}
-          action={
-            <div className="flex h-8 shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-[#DDE2EE] bg-white pl-2 pr-3">
-              <UserCheck className="size-4 text-[#8A8AA3]" strokeWidth={2} />
-              <span className="font-manrope text-[13px] text-[#6F6F8D]">Reachable contacts</span>
-              <span className="font-manrope text-[13px] font-bold text-[#17173A]">{nf.format(reach)}</span>
-              <button
-                type="button"
-                aria-label="Refresh reachable contacts"
-                onClick={() => {
-                  setRefreshing(true);
-                  window.setTimeout(() => setRefreshing(false), 900);
-                }}
-                className="grid size-5 place-items-center rounded-full text-[#8A8AA3] hover:bg-[#F0F3F9] hover:text-[#17173A]"
-              >
-                <RefreshCw className={cn("size-3.5", refreshing && "animate-spin")} strokeWidth={2.2} />
-              </button>
-            </div>
-          }
         >
+          <div className="mb-4 flex items-center gap-2 font-manrope text-sm">
+            <span className="text-[#6F6F8D]">Reachable contacts:</span>
+            <span className="font-bold text-[#17173A]">{nf.format(reach)}</span>
+            <button
+              type="button"
+              aria-label="Refresh reachable contacts"
+              onClick={() => {
+                setRefreshing(true);
+                window.setTimeout(() => setRefreshing(false), 900);
+              }}
+              className="grid size-6 place-items-center rounded-full text-[#8A8AA3] hover:bg-[#F0F3F9] hover:text-[#17173A]"
+            >
+              <RefreshCw className={cn("size-3.5", refreshing && "animate-spin")} strokeWidth={2.2} />
+            </button>
+          </div>
           <SubHeading>Selected contacts</SubHeading>
           {audience.mode === "segments" && audience.segments.some((sg) => sg.ai) ? (
             <div className="flex flex-wrap gap-2 py-1">
@@ -313,7 +390,7 @@ export default function PushPreviewBody({
           )}
         </Section>
 
-        <Section icon={Clock} title="Schedule" onEdit={() => onEditStep("schedule")}>
+        <Section icon={Clock} tone="schedule" compact={compact} title="Schedule" onEdit={() => onEditStep("schedule")}>
           <SubHeading>Schedule campaign</SubHeading>
           <Row label="Frequency cap:">{schedule.skipFrequencyCap ? "Skipped" : "Applied"}</Row>
           <Row label="When to send:">
@@ -327,7 +404,10 @@ export default function PushPreviewBody({
         </Section>
       </div>
 
-      <Section icon={LayoutTemplate} title="Content" onEdit={() => onEditStep("content")}>
+      {/* Sticks once its bottom reaches the bottom of the view, so scrolling on
+          moves only the left column and no blank space opens under the card. */}
+      <div ref={contentWrapRef} className="sticky" style={{ top: contentTop }}>
+      <Section icon={LayoutTemplate} tone="content" compact={compact} title="Content" onEdit={() => onEditStep("content")}>
         <Row label="Landing page:">App Homepage</Row>
         <Row label="Template:">
           {template ? `${template.name} · ID ${template.id}` : custom ? "Custom notification · Regular layout" : "Not selected"}
@@ -409,6 +489,7 @@ export default function PushPreviewBody({
           )}
         </div>
       </Section>
+      </div>
     </div>
   );
 }
