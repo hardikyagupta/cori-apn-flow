@@ -12,6 +12,10 @@ const DOMAINS = ["m3m.in", "mailer.m3m.in", "news.m3m.in", "offers.m3m.in"];
 const fieldClass =
   "w-full rounded-md border-0 bg-[#F7F9FC] px-3 py-2.5 font-manrope text-sm text-[#17173A] outline-none transition-colors placeholder:text-[#A0A0A0] focus:bg-[#F0F3F9]";
 
+/** Where the account's preset test contacts are configured. */
+const PRESET_CONFIG_URL =
+  "https://pr1r.netcoresmartech.com/qa_manual1/admin/index.php/admin/acc_config#test_contacts";
+
 const MAX_TEST_EMAILS = 10;
 const MAX_TEST_LIST_USERS = 100;
 
@@ -108,6 +112,7 @@ export default function SendTestMailDrawer({
   defaultSenderName,
   defaultDomain,
   testListMode = false,
+  presetEmails,
 }: {
   open: boolean;
   onClose: () => void;
@@ -117,6 +122,11 @@ export default function SendTestMailDrawer({
   /** The campaign's audience is a user data table, so the test goes to an
    *  uploaded list of test users rather than typed-in addresses. */
   testListMode?: boolean;
+  /** The template has a fixed test list: it's filled in, the preset box is
+   *  ticked, and the address field and recently used list are locked away.
+   *  An empty list means no presets are configured — an empty state replaces
+   *  the field. */
+  presetEmails?: string[];
 }) {
   const [shown, setShown] = useState(false);
   const [subject, setSubject] = useState(defaultSubject);
@@ -145,8 +155,8 @@ export default function SendTestMailDrawer({
     setSubject(defaultSubject);
     setSenderName(defaultSenderName);
     setDomain(defaultDomain || DOMAINS[0]);
-    setUsePreset(false);
-    setEmailAddress("");
+    setUsePreset(Boolean(presetEmails));
+    setEmailAddress(presetEmails ? presetEmails.join(", ") : "");
     setSelections({});
     setPage(0);
     setSentTo(null);
@@ -356,6 +366,22 @@ export default function SendTestMailDrawer({
             )}
           </div>
 
+          ) : presetEmails?.length === 0 ? (
+          <div className="flex flex-col items-center gap-4 rounded-[5px] border border-[#DDE2EE] bg-white p-5">
+            <img src="/campaign-assets/empty-no-data.svg" alt="" className="h-[190px] w-[244px]" />
+            <p className="text-center font-manrope text-sm font-normal leading-5 tracking-[0.42px] text-[#17173A]">
+              No preset values added. To add preset values,{" "}
+              <a
+                href={PRESET_CONFIG_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[#0A8FFD] hover:underline"
+              >
+                click here
+              </a>
+              .
+            </p>
+          </div>
           ) : (
           <div className="rounded-lg border border-[#DDE2EE] p-5">
             <label className="flex items-center gap-2.5">
@@ -363,7 +389,17 @@ export default function SendTestMailDrawer({
                 type="button"
                 role="checkbox"
                 aria-checked={usePreset}
-                onClick={() => setUsePreset((v) => !v)}
+                onClick={() => {
+                  const next = !usePreset;
+                  setUsePreset(next);
+                  // A template's fixed list is cleared when the box is unticked
+                  // (the field stays locked) and restored when it's ticked again.
+                  if (presetEmails) {
+                    setEmailAddress(next ? presetEmails.join(", ") : "");
+                    setSentTo(null);
+                    setPickerOpen(false);
+                  }
+                }}
                 className={cn(
                   "grid size-[18px] shrink-0 place-items-center rounded border-2 transition-colors",
                   usePreset ? "border-[#2F68E5] bg-[#2F68E5]" : "border-[#C3CAD9] bg-white"
@@ -381,7 +417,18 @@ export default function SendTestMailDrawer({
                   </svg>
                 )}
               </button>
-              <span className="font-manrope text-sm text-[#17173A]">Use preset test email addresses</span>
+              <span className="font-manrope text-sm text-[#17173A]">
+                Add preset test email addresses.{" "}
+                <a
+                  href={PRESET_CONFIG_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  className="text-[#0A8FFD] hover:underline"
+                >
+                  Configure here
+                </a>
+              </span>
             </label>
 
             <label className="mb-1.5 mt-5 flex items-center gap-1 font-manrope text-sm font-semibold text-[#17173A]">
@@ -397,13 +444,16 @@ export default function SendTestMailDrawer({
               }}
               placeholder="for ex: john.doe@gmail.com"
               rows={4}
-              className={cn(fieldClass, "resize-none")}
+              disabled={Boolean(presetEmails)}
+              className={cn(fieldClass, "resize-none", presetEmails && "cursor-not-allowed bg-[#EEEEEE] text-[#C4C4C4] focus:bg-[#EEEEEE]")}
             />
             <p className="mt-3 font-manrope text-xs leading-[18px] text-[#8A8AA3]">
               Note: You can add upto {MAX_TEST_EMAILS} email addresses seperated by commas. Test emails
               are excluded from billing.
             </p>
 
+            {!presetEmails && (
+            <>
             <div className="my-4 border-t border-[#EEF1F7]" />
 
             <p className="mb-3 font-manrope text-sm font-bold text-[#17173A]">Recently used</p>
@@ -420,6 +470,8 @@ export default function SendTestMailDrawer({
                 </button>
               ))}
             </div>
+            </>
+            )}
           </div>
           )}
 
@@ -449,9 +501,8 @@ export default function SendTestMailDrawer({
                         : `We found ${contactsFor(current).length} IDs linked to ${current}`}
                     </p>
                     <p className="mb-3 mt-1 font-manrope text-sm text-[#6F6F8D]">
-                      {ambiguous.length > 1
-                        ? "Select the IDs to test."
-                        : "Select the attributes to include in the test email."}
+                      The first matching ID is selected by default. Choose another ID to test with different
+                      attributes.
                     </p>
                   </div>
                 </div>

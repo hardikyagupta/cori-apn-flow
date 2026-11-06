@@ -553,6 +553,20 @@ function SegmentedTabs<T extends string>({
 /** Replaces the whole "Select a template" picker once one's been picked —
  *  a laptop/mobile preview of the chosen template, plus the three things
  *  you can do with it from here. */
+/** Templates whose test mails always go to a fixed set of addresses. */
+const PRESET_TEST_EMAILS_BY_TEMPLATE: Record<number, string[]> = {
+  8289: [
+    "hachavan2612@gmail.com",
+    "test@netcorecloud.com",
+    "aishwarya.sinha@netcorecloud.com",
+    "mohit.jaiswal@netcorecloud.com",
+    "testmartech3@netcorecloud.com",
+    "kamal.singhdeo@netcorecloud.com",
+  ],
+  // No presets configured — the drawer shows its empty state instead.
+  8286: [],
+};
+
 function TemplatePreviewPanel({
   template,
   channel,
@@ -701,6 +715,7 @@ function TemplatePreviewPanel({
           defaultSenderName={defaultSenderName}
           defaultDomain={defaultDomain}
           testListMode={testListMode}
+          presetEmails={template ? PRESET_TEST_EMAILS_BY_TEMPLATE[template.id] : undefined}
         />
       </div>
     );
@@ -931,6 +946,7 @@ function TemplatePreviewPanel({
           defaultSenderName={defaultSenderName}
           defaultDomain={defaultDomain}
           testListMode={testListMode}
+          presetEmails={template ? PRESET_TEST_EMAILS_BY_TEMPLATE[template.id] : undefined}
         />
       )}
     </div>
