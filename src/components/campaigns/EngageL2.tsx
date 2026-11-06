@@ -69,7 +69,7 @@ const items: {
 }[] = [
   { key: "campaigns", label: "Campaigns", icon: IconCampaigns, route: "/campaigns" },
   { key: "journey", label: "Journey", icon: IconJourney, route: "/journeys" },
-  { key: "onsite", label: "On-site messages", icon: IconOnSiteMessages },
+  { key: "onsite", label: "On-site messages", icon: IconOnSiteMessages, route: "/onsite-messages" },
   { key: "content", label: "Content personalisation", icon: IconContentPersonalisation },
   { key: "product", label: "Product personalisation", icon: IconProductPersonalisation },
 ];

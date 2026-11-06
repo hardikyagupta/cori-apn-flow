@@ -16,6 +16,7 @@ import AudienceSegments from "./pages/AudienceSegments";
 import AnalyticsFunnel from "./pages/AnalyticsFunnel";
 import Products from "./pages/Products";
 import Journeys from "./pages/Journeys";
+import OnsiteMessages from "./pages/OnsiteMessages";
 import JourneyCreate from "./pages/JourneyCreate";
 import JourneyBuilder from "./pages/JourneyBuilder";
 import JourneyReport from "./pages/JourneyReport";
@@ -52,6 +53,7 @@ const App = () => (
               <Route path="/analytics/funnel" element={<AnalyticsFunnel />} />
               <Route path="/content/products" element={<Products />} />
               <Route path="/journeys" element={<Journeys />} />
+              <Route path="/onsite-messages" element={<OnsiteMessages />} />
               <Route path="/journeys/create" element={<JourneyCreate />} />
               <Route path="/journeys/new" element={<JourneyBuilder />} />
               <Route path="/journeys/:journeyId/report" element={<JourneyReport />} />

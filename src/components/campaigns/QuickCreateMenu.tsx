@@ -81,6 +81,18 @@ const EMAIL_SUBMENU: SubmenuItem[] = [
   { label: "Split campaign", disabled: true, icon: typeIcon(iconAppPushSplit) },
 ];
 
+const IN_APP_SUBMENU: SubmenuItem[] = [
+  { label: "Regular campaign", icon: <ItemIcon src={iconInApp} inset="7.15% 7.14% 5.95% 5.36%" /> },
+  { label: "A/B campaign", disabled: true, icon: typeIcon(iconAppPushAb) },
+  { label: "Split campaign", disabled: true, icon: typeIcon(iconAppPushSplit) },
+];
+
+const WEB_MESSAGE_SUBMENU: SubmenuItem[] = [
+  { label: "Regular campaign", icon: <ItemIcon src={iconWebMessage} inset="7.15% 6.52% 4.93% 5.53%" /> },
+  { label: "A/B campaign", disabled: true, icon: typeIcon(iconAppPushAb) },
+  { label: "Split campaign", disabled: true, icon: typeIcon(iconAppPushSplit) },
+];
+
 const SECTIONS: QuickCreateSection[] = [
   {
     items: [{ label: "Journey", icon: iconJourney, inset: "7.15% 7.14% 7.14% 10.72%" }],
@@ -111,8 +123,20 @@ const SECTIONS: QuickCreateSection[] = [
   {
     heading: "Onsite",
     items: [
-      { label: "In-app Message", icon: iconInApp, inset: "7.15% 7.14% 5.95% 5.36%" },
-      { label: "Web Message", icon: iconWebMessage, inset: "7.15% 6.52% 4.93% 5.53%" },
+      {
+        label: "In-app Message",
+        icon: iconInApp,
+        inset: "7.15% 7.14% 5.95% 5.36%",
+        hasSubmenu: true,
+        submenu: IN_APP_SUBMENU,
+      },
+      {
+        label: "Web Message",
+        icon: iconWebMessage,
+        inset: "7.15% 6.52% 4.93% 5.53%",
+        hasSubmenu: true,
+        submenu: WEB_MESSAGE_SUBMENU,
+      },
     ],
   },
   {
