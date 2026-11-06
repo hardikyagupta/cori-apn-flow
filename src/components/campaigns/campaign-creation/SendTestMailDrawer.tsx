@@ -448,8 +448,9 @@ export default function SendTestMailDrawer({
               className={cn(fieldClass, "resize-none", presetEmails && "cursor-not-allowed bg-[#EEEEEE] text-[#C4C4C4] focus:bg-[#EEEEEE]")}
             />
             <p className="mt-3 font-manrope text-xs leading-[18px] text-[#8A8AA3]">
-              Note: You can add upto {MAX_TEST_EMAILS} email addresses seperated by commas. Test emails
-              are excluded from billing.
+              {presetEmails
+                ? "Note: Test emails are excluded from billing."
+                : `Note: You can add upto ${MAX_TEST_EMAILS} email addresses seperated by commas. Test emails are excluded from billing.`}
             </p>
 
             {!presetEmails && (
